@@ -47,6 +47,18 @@ export const EFFORT_DISTANCES: Record<Discipline, { m: number; label: string }[]
  * the dashboard opens in a tight/infeasible state with live relaxation options.
  */
 export const DEFAULT_REQUEST: SolveRequest = {
+  week_template: {
+    days: [
+      { discipline: null, is_long: false },
+      { discipline: 'swim', is_long: false },
+      { discipline: 'bike', is_long: false },
+      { discipline: 'run', is_long: true },
+      { discipline: 'swim', is_long: false },
+      { discipline: 'bike', is_long: true },
+      { discipline: null, is_long: false },
+    ],
+  },
+  blackout_days: [],
   profile: {
     age_years: 40,
     sex: 'male',

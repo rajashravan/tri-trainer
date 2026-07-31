@@ -1,10 +1,13 @@
 import math
+from dataclasses import replace
 
 import pytest
 
-from core import critical_speed, progression, relax, riegel, solve
+from core import critical_speed, progression, relax, riegel, solve, week
 from core.types import (
     Allocation,
+    DaySlot,
+    WeekTemplate,
     AthleteProfile,
     Effort,
     GoalSpec,
@@ -27,6 +30,8 @@ def make_request(**overrides) -> SolveRequest:
         allocation=Allocation(1.5, 4.0, 2.5),
         goal=GoalSpec(18000, 1946, 9600, 5974),
         settings=SolverSettings(),
+        week_template=week.default_template(),
+        blackout_days=[],
     )
     base.update(overrides)
     return SolveRequest(**base)
@@ -236,3 +241,126 @@ def test_apply_delta_preserves_allocation_budget():
     after = relax.apply_delta(make_request(), "weekly_hours", 2.0)
     total = after.allocation.swim_h + after.allocation.bike_h + after.allocation.run_h
     assert total == pytest.approx(after.weekly_hours_available)
+
+
+# ---------------------------------------------------------------- week template
+
+
+def _tpl(spec: str) -> WeekTemplate:
+    """'- s B R S b -' : dash rest, letter discipline, uppercase == long session."""
+    out = []
+    for token in spec.split():
+        if token == "-":
+            out.append(DaySlot(None, False))
+        else:
+            disc = {"s": "swim", "b": "bike", "r": "run"}[token[0].lower()]
+            out.append(DaySlot(disc, token[0].isupper()))
+    return WeekTemplate(days=out)
+
+
+def test_default_template_is_well_spaced():
+    s = week.score(week.default_template())
+    assert s.ramp_multiplier == 1.0
+    assert s.reasons == []
+
+
+def test_two_long_days_back_to_back_is_not_penalised():
+    """The classic long-ride-then-long-run weekend is normal practice, not a defect."""
+    assert week.score(_tpl("- s b r S B -")).ramp_multiplier == 1.0
+
+
+def test_stacking_hard_days_tightens_the_ramp_ceiling():
+    scores = [week.score(_tpl(s)).ramp_multiplier
+              for s in ("- s b r S B -", "- s b R S B -", "- s B R S B -")]
+    assert scores == sorted(scores, reverse=True)
+    assert scores[-1] < scores[0]
+
+
+def test_week_scoring_wraps_around_the_week():
+    """Sunday and Monday are adjacent because the week repeats."""
+    assert week.score(_tpl("B s b r s - R")).consecutive_hard_days == 2
+
+
+def test_no_rest_day_is_penalised():
+    s = week.score(_tpl("s b r s b r s"))
+    assert s.rest_days == 0
+    assert "no rest day" in s.reasons
+    assert s.ramp_multiplier < 0.7
+
+
+def test_bad_spacing_flips_an_otherwise_survivable_plan():
+    """
+    The point of the feature: identical training volume, different week layout, and the
+    badly-spaced one becomes infeasible on spacing rather than on fitness.
+    """
+    base = _at(make_request(), hours=15, weeks=9)
+    good = solve.solve(base)
+    bad = solve.solve(replace(base, week_template=_tpl("- s b R S B -")))
+
+    assert good.binding_constraint != "week_spacing"
+    assert bad.binding_constraint == "week_spacing"
+    assert bad.verdict == "infeasible"
+    assert "consecutive hard days" in bad.binding_explanation
+    assert "%/month" in bad.binding_explanation
+
+
+def test_spacing_does_not_change_the_fitness_maths():
+    """Layout moves the ramp ceiling, not the projected finish."""
+    base = make_request()
+    other = replace(base, week_template=_tpl("s b r s b r s"))
+    assert solve.solve(base).projected_finish_s == pytest.approx(
+        solve.solve(other).projected_finish_s
+    )
+
+
+# ---------------------------------------------------------------- blackouts
+
+
+def test_small_blackout_is_absorbed_by_neighbouring_weeks():
+    req = make_request()
+    out = solve.solve(replace(req, blackout_days=[(8, d) for d in range(3)]))
+    assert out.schedule.unabsorbed_stress == 0.0
+    assert out.binding_constraint != "blackout"
+    # The load has to go somewhere, so the ramp gets steeper.
+    assert out.load.peak_weekly_ctl_ramp > solve.solve(req).load.peak_weekly_ctl_ramp
+
+
+def test_blackout_preserves_total_training_stress():
+    """Redistribution moves load, it does not quietly delete it."""
+    req = make_request()
+    before = sum(solve.solve(req).schedule.weekly_stress)
+    after = solve.solve(replace(req, blackout_days=[(8, d) for d in range(4)]))
+    assert sum(after.schedule.weekly_stress) + after.schedule.unabsorbed_stress == pytest.approx(
+        before, rel=1e-6
+    )
+
+
+def test_unabsorbable_blackout_becomes_the_binding_constraint():
+    """A blackout wider than the redistribution window fails loudly, not silently."""
+    req = make_request()
+    out = solve.solve(
+        replace(req, blackout_days=[(w, d) for w in range(7, 12) for d in range(7)])
+    )
+    assert out.schedule.unabsorbed_stress > 0
+    assert out.binding_constraint == "blackout"
+    assert out.verdict == "infeasible"
+    assert "x the safe ceiling" in out.binding_explanation
+
+
+def test_blackout_days_render_empty_in_the_grid():
+    out = solve.solve(replace(make_request(), blackout_days=[(2, 1)]))
+    cell = next(c for c in out.schedule.cells if c.week == 2 and c.day == 1)
+    assert cell.is_blackout and cell.load == 0.0 and cell.discipline is None
+
+
+def test_grid_shows_the_ramp_climbing():
+    """The whole point of showing every week at once: load must visibly rise."""
+    cells = solve.solve(make_request()).schedule
+    weekly = cells.weekly_stress
+    assert weekly[-1] > weekly[0] * 1.3
+    assert weekly == sorted(weekly)
+
+
+def test_race_day_is_marked_once():
+    grid = solve.solve(make_request()).schedule
+    assert sum(1 for c in grid.cells if c.is_race) == 1

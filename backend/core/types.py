@@ -52,6 +52,49 @@ class GoalSpec:
 
 
 @dataclass(frozen=True)
+class DaySlot:
+    discipline: str | None      # None == rest
+    is_long: bool
+
+
+@dataclass(frozen=True)
+class WeekTemplate:
+    days: list[DaySlot]         # 7, Monday first
+
+
+@dataclass(frozen=True)
+class RecoveryScore:
+    value: float                # 0..1, 1 == well spaced
+    ramp_multiplier: float      # scales the safe ramp ceiling
+    consecutive_hard_days: int
+    longest_training_block: int
+    min_same_discipline_gap: int
+    rest_days: int
+    reasons: list[str]
+
+
+@dataclass(frozen=True)
+class DayCell:
+    week: int
+    day: int                    # 0 == Monday
+    discipline: str | None
+    is_long: bool
+    load: float
+    is_blackout: bool
+    is_race: bool
+
+
+@dataclass(frozen=True)
+class ScheduleGrid:
+    weeks: int
+    cells: list[DayCell]
+    peak_day_load: float
+    weekly_stress: list[float]
+    unabsorbed_stress: float
+    blackout_weeks: list[int]
+
+
+@dataclass(frozen=True)
 class SolverSettings:
     acwr_flag_threshold: float = 1.5
     max_weekly_ctl_ramp: float = 8.0
@@ -90,6 +133,8 @@ class SolveRequest:
     allocation: Allocation
     goal: GoalSpec
     settings: SolverSettings
+    week_template: WeekTemplate
+    blackout_days: list[tuple[int, int]]        # (week_index, day_index)
 
 
 # ---------------------------------------------------------------- derived
@@ -175,6 +220,8 @@ class SolveResponse:
     models: list[DisciplineModel]
     predictions: list[DisciplinePrediction]
     load: LoadProjection
+    recovery: RecoveryScore
+    schedule: ScheduleGrid
     injury: InjuryRisk
     injury_absorbers: list[AbsorberOption]
     relaxations: list[RelaxationOption]

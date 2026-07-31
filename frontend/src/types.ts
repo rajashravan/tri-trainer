@@ -35,7 +35,29 @@ export interface SolverSettings {
   tri_run_penalty_frac: number
 }
 
+export type DayDiscipline = Discipline | null
+
+export interface DaySlot {
+  discipline: DayDiscipline
+  is_long: boolean
+}
+
+export interface WeekTemplate {
+  days: DaySlot[]
+}
+
+export const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+/** rest -> swim -> bike -> run -> rest */
+export const CYCLE: DayDiscipline[] = [null, 'swim', 'bike', 'run']
+
+export function nextDiscipline(current: DayDiscipline): DayDiscipline {
+  return CYCLE[(CYCLE.indexOf(current) + 1) % CYCLE.length]
+}
+
 export interface SolveRequest {
+  week_template: WeekTemplate
+  blackout_days: [number, number][]
   injury_target_pct?: number | null
   profile: AthleteProfile
   race: RaceKey

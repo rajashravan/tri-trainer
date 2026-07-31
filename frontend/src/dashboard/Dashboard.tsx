@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import ControlRail from './ControlRail'
 import InjuryPanel from './InjuryPanel'
+import WeekTemplateEditor from './WeekTemplateEditor'
+import LoadHeatmap from './LoadHeatmap'
 import { useSolver } from '../useSolver'
 import { formatClock, formatDuration } from '../format'
 import { VERDICT_LABEL, type AbsorberOption } from '../solveTypes'
@@ -175,6 +177,18 @@ export default function Dashboard({ request, onApply, onBack }: Props) {
           </tbody>
         </table>
       </section>
+
+      <WeekTemplateEditor
+        template={request.week_template}
+        recovery={result.recovery}
+        onChange={(week_template) => onApply({ week_template })}
+      />
+
+      <LoadHeatmap
+        grid={result.schedule}
+        blackouts={request.blackout_days}
+        onBlackouts={(blackout_days) => onApply({ blackout_days })}
+      />
 
       <InjuryPanel
         injury={result.injury}

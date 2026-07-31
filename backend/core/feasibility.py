@@ -1,6 +1,6 @@
 """Verdict, margin, and binding-constraint selection."""
 
-from core import critical_speed, defaults, load, progression, riegel
+from core import critical_speed, defaults, load, progression, riegel, schedule, week
 from core.types import (
     DISCIPLINES,
     DisciplineModel,
@@ -10,6 +10,13 @@ from core.types import (
 )
 
 LABEL = {"swim": "Swim", "bike": "Bike", "run": "Run"}
+REDISTRIBUTION_NOTE = "the surrounding 2 weeks"
+
+
+def _pct_month(ramp_per_week: float, projection) -> float:
+    """Express a CTL/week ramp as monthly % growth against the block's mean fitness."""
+    mean_ctl = sum(projection.weekly_ctl) / max(1, len(projection.weekly_ctl))
+    return 100.0 * ramp_per_week * 4.0 / max(1e-9, mean_ctl)
 
 
 def fit_models(req: SolveRequest) -> dict[str, DisciplineModel]:
@@ -95,17 +102,20 @@ def evaluate(req: SolveRequest) -> dict:
 
     # HARD constraint. A plan requiring a physiologically implausible ramp is infeasible
     # regardless of the fitness maths, and it takes over as the binding constraint.
-    projection = load.project(req)
-    if projection.ramp_hard_violation:
+    #
+    # The ceiling is not fixed: a badly-spaced week recovers worse, so it can absorb a
+    # shallower ramp. Blackouts shift load between weeks, which shows up in the ramp too.
+    recovery = week.score(req.week_template)
+    grid = schedule.build(req)
+    projection = load.project(req, grid.weekly_stress)
+    safe_ramp = settings.max_weekly_ctl_ramp * recovery.ramp_multiplier
+    violated = projection.peak_weekly_ctl_ramp > safe_ramp
+
+    def _fail(constraint: str, explanation: str) -> dict:
         return {
             "verdict": "infeasible",
-            "binding_constraint": "ramp_rate",
-            "binding_explanation": (
-                f"This plan ramps at {projection.peak_weekly_ctl_ramp:.1f} CTL/week against "
-                f"your ceiling of {settings.max_weekly_ctl_ramp:.1f}. Going from "
-                f"{req.profile.current_weekly_hours:.1f} to {req.weekly_hours_available:.1f} "
-                f"h/week in {req.weeks_until_race} weeks is too steep to absorb."
-            ),
+            "binding_constraint": constraint,
+            "binding_explanation": explanation,
             "projected_finish_s": projected_finish,
             "goal_finish_s": req.goal.total_s,
             "margin_s": margin,
@@ -114,7 +124,37 @@ def evaluate(req: SolveRequest) -> dict:
                 req, current, projected, required, plausible, headroom, binding_d, "infeasible"
             ),
             "load": projection,
+            "recovery": recovery,
+            "schedule": grid,
+            "safe_ramp": safe_ramp,
         }
+
+    if grid.unabsorbed_stress > 0:
+        blocked = ", ".join(str(w + 1) for w in grid.blackout_weeks[:3])
+        ratio = projection.peak_weekly_ctl_ramp / max(1e-9, safe_ramp)
+        return _fail(
+            "blackout",
+            f"Blackout in week {blocked} cannot be made up within {REDISTRIBUTION_NOTE} — "
+            f"it pushes required ramp to {ratio:.1f}x the safe ceiling. Shorten the "
+            f"blackout, or move it next to a lighter week.",
+        )
+
+    if violated:
+        if recovery.ramp_multiplier < 1.0:
+            return _fail(
+                "week_spacing",
+                f"{recovery.reasons[0].capitalize()} reduces safe ramp to "
+                f"{_pct_month(safe_ramp, projection):.0f}%/month — plan requires "
+                f"{_pct_month(projection.peak_weekly_ctl_ramp, projection):.0f}%. "
+                f"Spread the hard days out, or ramp more gently.",
+            )
+        return _fail(
+            "ramp_rate",
+            f"This plan ramps at {projection.peak_weekly_ctl_ramp:.1f} CTL/week against "
+            f"your ceiling of {safe_ramp:.1f}. Going from "
+            f"{req.profile.current_weekly_hours:.1f} to {req.weekly_hours_available:.1f} "
+            f"h/week in {req.weeks_until_race} weeks is too steep to absorb.",
+        )
 
     if verdict == "feasible":
         binding = "aggregate_margin"
@@ -142,6 +182,9 @@ def evaluate(req: SolveRequest) -> dict:
             req, current, projected, required, plausible, headroom, binding_d, verdict
         ),
         "load": projection,
+        "recovery": recovery,
+        "schedule": grid,
+        "safe_ramp": safe_ramp,
     }
 
 

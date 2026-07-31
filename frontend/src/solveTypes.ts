@@ -65,6 +65,35 @@ export interface AbsorberOption {
   helps_goal: boolean
 }
 
+export interface RecoveryScore {
+  value: number
+  ramp_multiplier: number
+  consecutive_hard_days: number
+  longest_training_block: number
+  min_same_discipline_gap: number
+  rest_days: number
+  reasons: string[]
+}
+
+export interface DayCell {
+  week: number
+  day: number
+  discipline: 'swim' | 'bike' | 'run' | null
+  is_long: boolean
+  load: number
+  is_blackout: boolean
+  is_race: boolean
+}
+
+export interface ScheduleGrid {
+  weeks: number
+  cells: DayCell[]
+  peak_day_load: number
+  weekly_stress: number[]
+  unabsorbed_stress: number
+  blackout_weeks: number[]
+}
+
 export interface SolveResponse {
   verdict: Verdict
   binding_constraint: string
@@ -75,6 +104,8 @@ export interface SolveResponse {
   models: DisciplineModel[]
   predictions: DisciplinePrediction[]
   load: LoadProjection
+  recovery: RecoveryScore
+  schedule: ScheduleGrid
   injury: InjuryRisk
   injury_absorbers: AbsorberOption[]
   relaxations: RelaxationOption[]

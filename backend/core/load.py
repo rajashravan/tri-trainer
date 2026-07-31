@@ -29,7 +29,13 @@ def total_weekly_stress(req: SolveRequest, weekly_hours: float) -> float:
     return total
 
 
-def project(req: SolveRequest) -> LoadProjection:
+def project(req: SolveRequest, weekly_stress: list[float] | None = None) -> LoadProjection:
+    """
+    CTL/ATL/ACWR across the block.
+
+    `weekly_stress` overrides the smooth linear ramp — the schedule builder passes the
+    blackout-adjusted series so that redistributed load shows up in the ramp rate.
+    """
     settings = req.settings
     weeks = max(1, req.weeks_until_race)
 
@@ -44,9 +50,12 @@ def project(req: SolveRequest) -> LoadProjection:
     prev_ctl = ctl
 
     for w in range(weeks):
-        # Linear ramp of weekly volume across the block.
-        frac = w / (weeks - 1) if weeks > 1 else 1.0
-        daily = start_daily + (target_daily - start_daily) * frac
+        if weekly_stress is not None and w < len(weekly_stress):
+            daily = weekly_stress[w] / 7.0
+        else:
+            # Linear ramp of weekly volume across the block.
+            frac = w / (weeks - 1) if weeks > 1 else 1.0
+            daily = start_daily + (target_daily - start_daily) * frac
         for _ in range(7):
             ctl += (daily - ctl) / CTL_TAU_DAYS
             atl += (daily - atl) / ATL_TAU_DAYS

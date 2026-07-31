@@ -3,10 +3,12 @@ from typing import Literal
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field, model_validator
 
-from core import defaults, solve
+from core import defaults, solve, week
 from core.types import (
     DISCIPLINES,
     Allocation,
+    DaySlot,
+    WeekTemplate,
     AthleteProfile,
     Effort,
     GoalSpec,
@@ -57,6 +59,15 @@ class SettingsIn(BaseModel):
     injury_steepness: float = Field(default=5.5, gt=0, le=50)
 
 
+class DaySlotIn(BaseModel):
+    discipline: Literal["swim", "bike", "run"] | None = None
+    is_long: bool = False
+
+
+class WeekTemplateIn(BaseModel):
+    days: list[DaySlotIn]
+
+
 class SolveIn(BaseModel):
     profile: ProfileIn
     race: Literal["sprint", "olympic", "half", "full"]
@@ -66,6 +77,8 @@ class SolveIn(BaseModel):
     allocation: AllocationIn
     goal: GoalIn
     settings: SettingsIn = SettingsIn()
+    week_template: WeekTemplateIn | None = None
+    blackout_days: list[tuple[int, int]] = []
     injury_target_pct: float | None = Field(default=None, ge=0, le=100)
 
     @model_validator(mode="after")
@@ -81,6 +94,18 @@ class SolveIn(BaseModel):
                 f"allocation sums to {allocated:.2f} h but the weekly budget is "
                 f"{self.weekly_hours_available:.2f} h"
             )
+
+        if self.week_template is not None:
+            if len(self.week_template.days) != 7:
+                raise ValueError("week template must have exactly 7 days")
+            if not any(d.discipline for d in self.week_template.days):
+                raise ValueError("week template needs at least one training day")
+
+        for w, d in self.blackout_days:
+            if not 0 <= d <= 6:
+                raise ValueError(f"blackout day index {d} is outside Mon-Sun")
+            if not 0 <= w < self.weeks_until_race:
+                raise ValueError(f"blackout week {w + 1} is outside the training block")
 
         race = defaults.race_def(self.race)
         for d in DISCIPLINES:
@@ -103,6 +128,12 @@ def to_domain(payload: SolveIn) -> SolveRequest:
         allocation=Allocation(**payload.allocation.model_dump()),
         goal=GoalSpec(**payload.goal.model_dump()),
         settings=SolverSettings(**payload.settings.model_dump()),
+        week_template=(
+            WeekTemplate(days=[DaySlot(d.discipline, d.is_long) for d in payload.week_template.days])
+            if payload.week_template is not None
+            else week.default_template()
+        ),
+        blackout_days=[(int(w), int(d)) for w, d in payload.blackout_days],
     )
 
 
