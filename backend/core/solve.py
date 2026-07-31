@@ -1,6 +1,6 @@
 """Orchestrator. The only core module main.py imports."""
 
-from core import injury, relax
+from core import injury, relax, schedule
 from core.feasibility import evaluate
 from core.types import AbsorberOption, SolveRequest, SolveResponse
 
@@ -9,6 +9,11 @@ CS_VALID_MAX_S = 900.0
 
 def _warnings(req: SolveRequest, result: dict) -> list[str]:
     out: list[str] = []
+    for d in schedule.orphaned_disciplines(req):
+        out.append(
+            f"{d.capitalize()}: {req.allocation.get(d):.1f} h/week allocated but no "
+            f"{d} day in your week — those hours are not being trained."
+        )
     for model in result["models"]:
         d = model.discipline
         if model.fit_source == "riegel_default":

@@ -79,7 +79,11 @@ class DayCell:
     day: int                    # 0 == Monday
     discipline: str | None
     is_long: bool
-    load: float
+    load: float                 # stress score
+    duration_s: float
+    distance_m: float
+    intensity_factor: float
+    session_kind: str           # endurance | threshold | rest
     is_blackout: bool
     is_race: bool
 
@@ -90,6 +94,7 @@ class ScheduleGrid:
     cells: list[DayCell]
     peak_day_load: float
     weekly_stress: list[float]
+    unabsorbed_hours: float
     unabsorbed_stress: float
     blackout_weeks: list[int]
 

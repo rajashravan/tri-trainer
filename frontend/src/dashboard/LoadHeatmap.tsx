@@ -1,21 +1,37 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ScheduleGrid } from '../solveTypes'
-import { DAY_NAMES } from '../types'
+import DayIcon from './DayIcon'
+import { formatClock, formatPace } from '../format'
+import type { DayCell, ScheduleGrid } from '../solveTypes'
+import { DAY_NAMES, DISCIPLINE_LABEL } from '../types'
 
 interface Props {
   grid: ScheduleGrid
   blackouts: [number, number][]
+  goalFinishS: number
   onBlackouts: (next: [number, number][]) => void
 }
 
 const LEVELS = 5
+const TOOLTIP_W = 216
 
 const key = (w: number, d: number) => `${w}:${d}`
 
-export default function LoadHeatmap({ grid, blackouts, onBlackouts }: Props) {
+function distanceLabel(cell: DayCell): string {
+  if (cell.discipline === 'swim') return `${Math.round(cell.distance_m).toLocaleString()} m`
+  return `${(cell.distance_m / 1000).toFixed(1)} km`
+}
+
+function durationLabel(seconds: number): string {
+  const m = Math.round(seconds / 60)
+  return m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m` : `${m} min`
+}
+
+export default function LoadHeatmap({ grid, blackouts, goalFinishS, onBlackouts }: Props) {
   const set = new Set(blackouts.map(([w, d]) => key(w, d)))
   const dragging = useRef<null | { adding: boolean }>(null)
+  const wrap = useRef<HTMLDivElement>(null)
   const [preview, setPreview] = useState<Set<string>>(new Set())
+  const [hover, setHover] = useState<{ cell: DayCell; left: number; top: number } | null>(null)
 
   // Drag-select a range of days. Not drag-and-drop — just a painted selection.
   useEffect(() => {
@@ -27,9 +43,7 @@ export default function LoadHeatmap({ grid, blackouts, onBlackouts }: Props) {
         if (current.size === 0) return current
         const next = new Set(set)
         current.forEach((k) => (adding ? next.add(k) : next.delete(k)))
-        onBlackouts(
-          [...next].map((k) => k.split(':').map(Number) as [number, number]),
-        )
+        onBlackouts([...next].map((k) => k.split(':').map(Number) as [number, number]))
         return new Set()
       })
     }
@@ -37,23 +51,24 @@ export default function LoadHeatmap({ grid, blackouts, onBlackouts }: Props) {
     return () => window.removeEventListener('mouseup', stop)
   })
 
-  const start = (w: number, d: number) => {
-    const adding = !set.has(key(w, d))
-    dragging.current = { adding }
-    setPreview(new Set([key(w, d)]))
-  }
-
-  const extend = (w: number, d: number) => {
-    if (!dragging.current) return
-    setPreview((p) => new Set(p).add(key(w, d)))
-  }
-
-  const cellAt = (w: number, d: number) =>
-    grid.cells.find((c) => c.week === w && c.day === d)
+  const cellAt = (w: number, d: number) => grid.cells.find((c) => c.week === w && c.day === d)
 
   const level = (load: number) => {
     if (load <= 0) return 0
     return Math.min(LEVELS, Math.max(1, Math.ceil((load / grid.peak_day_load) * LEVELS)))
+  }
+
+  const enter = (e: React.MouseEvent, cell: DayCell) => {
+    if (dragging.current) setPreview((p) => new Set(p).add(key(cell.week, cell.day)))
+    const box = wrap.current?.getBoundingClientRect()
+    if (!box) return
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const raw = r.left - box.left + r.width / 2 - TOOLTIP_W / 2
+    setHover({
+      cell,
+      left: Math.max(0, Math.min(raw, box.width - TOOLTIP_W)),
+      top: r.top - box.top,
+    })
   }
 
   return (
@@ -61,7 +76,7 @@ export default function LoadHeatmap({ grid, blackouts, onBlackouts }: Props) {
       <div className="panel-head">
         <h2>Training block — {grid.weeks} weeks</h2>
         <span className="hint">
-          Click or drag to black out days you are unavailable
+          Hover a day for its session · click or drag to black out
           {blackouts.length > 0 && (
             <button className="link-btn clear-bo" onClick={() => onBlackouts([])}>
               clear {blackouts.length}
@@ -70,7 +85,7 @@ export default function LoadHeatmap({ grid, blackouts, onBlackouts }: Props) {
         </span>
       </div>
 
-      <div className="heat-wrap">
+      <div className="heat-wrap" ref={wrap} onMouseLeave={() => setHover(null)}>
         <div className="heat-days">
           {DAY_NAMES.map((n) => (
             <span key={n}>{n}</span>
@@ -84,32 +99,73 @@ export default function LoadHeatmap({ grid, blackouts, onBlackouts }: Props) {
                 if (!cell) return <span key={d} className="heat-cell" />
                 const k = key(w, d)
                 const shown = preview.has(k)
-                  ? dragging.current?.adding ?? cell.is_blackout
+                  ? (dragging.current?.adding ?? cell.is_blackout)
                   : cell.is_blackout
-                const cls = cell.is_race
-                  ? 'race'
-                  : shown
-                    ? 'blackout'
-                    : `lv${level(cell.load)}`
+                const cls = cell.is_race ? 'race' : shown ? 'blackout' : `lv${level(cell.load)}`
                 return (
                   <span
                     key={d}
-                    className={`heat-cell ${cls}`}
-                    onMouseDown={() => start(w, d)}
-                    onMouseEnter={() => extend(w, d)}
-                    title={
-                      cell.is_race
-                        ? 'Race day'
-                        : shown
-                          ? `Week ${w + 1} ${DAY_NAMES[d]} — blacked out`
-                          : `Week ${w + 1} ${DAY_NAMES[d]} — ${cell.discipline ?? 'rest'}${cell.is_long ? ' (long)' : ''} · ${cell.load.toFixed(0)} load`
-                    }
+                    className={`heat-cell ${cls}${hover?.cell === cell ? ' hot' : ''}`}
+                    onMouseDown={() => {
+                      dragging.current = { adding: !set.has(k) }
+                      setPreview(new Set([k]))
+                    }}
+                    onMouseEnter={(e) => enter(e, cell)}
                   />
                 )
               })}
             </div>
           ))}
         </div>
+
+        {hover && (
+          <div
+            className={`day-pop ${hover.cell.discipline ?? 'rest'}`}
+            style={{ left: hover.left, top: hover.top, width: TOOLTIP_W }}
+          >
+            <div className="pop-head">
+              <span>
+                Week {hover.cell.week + 1} · {DAY_NAMES[hover.cell.day]}
+              </span>
+              {hover.cell.session_kind !== 'rest' && !hover.cell.is_blackout && (
+                <span className={`pop-kind ${hover.cell.session_kind}`}>
+                  {hover.cell.session_kind}
+                </span>
+              )}
+            </div>
+
+            {hover.cell.is_race ? (
+              <>
+                <div className="pop-target">Race day</div>
+                <div className="pop-sub">Goal finish {formatClock(goalFinishS)}</div>
+              </>
+            ) : hover.cell.is_blackout ? (
+              <>
+                <div className="pop-target muted">Blacked out</div>
+                <div className="pop-sub">Load moved to nearby weeks</div>
+              </>
+            ) : hover.cell.duration_s <= 0 ? (
+              <>
+                <div className="pop-target muted">Rest</div>
+                <div className="pop-sub">No session</div>
+              </>
+            ) : (
+              <>
+                <div className="pop-sport">
+                  <DayIcon discipline={hover.cell.discipline} />
+                  {DISCIPLINE_LABEL[hover.cell.discipline!]}
+                </div>
+                <div className="pop-target">{distanceLabel(hover.cell)}</div>
+                <div className="pop-sub">
+                  {formatPace(hover.cell.distance_m, hover.cell.duration_s, hover.cell.discipline!)}
+                  <span className="pop-dot">·</span>
+                  {durationLabel(hover.cell.duration_s)}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
         <div className="heat-weeks">
           <span>week 1</span>
           <span>race</span>

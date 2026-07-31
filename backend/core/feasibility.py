@@ -106,7 +106,7 @@ def evaluate(req: SolveRequest) -> dict:
     # The ceiling is not fixed: a badly-spaced week recovers worse, so it can absorb a
     # shallower ramp. Blackouts shift load between weeks, which shows up in the ramp too.
     recovery = week.score(req.week_template)
-    grid = schedule.build(req)
+    grid = schedule.build(req, models)
     projection = load.project(req, grid.weekly_stress)
     safe_ramp = settings.max_weekly_ctl_ramp * recovery.ramp_multiplier
     violated = projection.peak_weekly_ctl_ramp > safe_ramp

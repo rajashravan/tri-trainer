@@ -1150,3 +1150,99 @@ body {
 .leg-delta.under { color: #0b6b3c; }
 
 .split-help { margin: 12px 0 0; font-size: 12.5px; color: var(--ink-3); }
+
+/* ---- day session popup ---- */
+
+.heat-wrap { position: relative; }
+
+.heat-cell.hot { box-shadow: 0 0 0 2px var(--ink); }
+
+.day-pop {
+  position: absolute;
+  transform: translateY(calc(-100% - 10px));
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  box-shadow: 0 4px 6px rgba(16, 20, 24, 0.05), 0 12px 28px rgba(16, 20, 24, 0.14);
+  padding: 11px 13px 12px;
+  pointer-events: none;
+  z-index: 20;
+  border-top: 3px solid var(--ink-3);
+  animation: pop-in 0.09s ease-out;
+}
+
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(calc(-100% - 4px)); }
+  to   { opacity: 1; transform: translateY(calc(-100% - 10px)); }
+}
+
+.day-pop.swim { border-top-color: #2f7fb5; }
+.day-pop.bike { border-top-color: #1a6b4f; }
+.day-pop.run  { border-top-color: #b4531a; }
+
+.day-pop::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  margin-left: -6px;
+  width: 11px;
+  height: 11px;
+  background: #fff;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  transform: rotate(45deg);
+}
+
+.pop-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  color: var(--ink-3);
+  margin-bottom: 7px;
+}
+
+.pop-kind {
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 9px;
+}
+
+.pop-kind.endurance { background: #e9f2ee; color: #17553f; }
+.pop-kind.threshold { background: #fbeee5; color: #8c400f; }
+
+.pop-sport {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+  margin-bottom: 3px;
+}
+
+.pop-sport svg { width: 17px; height: 17px; }
+
+.pop-target {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.pop-target.muted { color: var(--ink-3); font-size: 19px; }
+
+.pop-sub {
+  margin-top: 3px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.pop-dot { margin: 0 6px; color: var(--ink-3); }

@@ -325,14 +325,19 @@ def test_small_blackout_is_absorbed_by_neighbouring_weeks():
     assert out.load.peak_weekly_ctl_ramp > solve.solve(req).load.peak_weekly_ctl_ramp
 
 
-def test_blackout_preserves_total_training_stress():
-    """Redistribution moves load, it does not quietly delete it."""
+def test_blackout_preserves_total_training_hours():
+    """
+    Redistribution moves training, it does not quietly delete it.
+
+    The invariant is HOURS, not stress: an hour lost from a long aerobic day that lands
+    on threshold days carries more stress than it did before. That is the intended
+    physiology, so conservation is asserted on the quantity that is actually conserved.
+    """
     req = make_request()
-    before = sum(solve.solve(req).schedule.weekly_stress)
+    hours = lambda r: sum(c.duration_s for c in r.schedule.cells) / 3600.0
+    before = hours(solve.solve(req))
     after = solve.solve(replace(req, blackout_days=[(8, d) for d in range(4)]))
-    assert sum(after.schedule.weekly_stress) + after.schedule.unabsorbed_stress == pytest.approx(
-        before, rel=1e-6
-    )
+    assert hours(after) + after.schedule.unabsorbed_hours == pytest.approx(before, rel=1e-6)
 
 
 def test_unabsorbable_blackout_becomes_the_binding_constraint():

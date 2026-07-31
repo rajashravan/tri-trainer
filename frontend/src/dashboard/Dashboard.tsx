@@ -193,6 +193,7 @@ export default function Dashboard({ request, onApply, onBack }: Props) {
 
       <LoadHeatmap
         grid={result.schedule}
+        goalFinishS={request.goal.total_s}
         blackouts={request.blackout_days}
         onBlackouts={(blackout_days) => onApply({ blackout_days })}
       />

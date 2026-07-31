@@ -13,6 +13,7 @@ constants are exposed in SolverSettings.
 import math
 from dataclasses import replace
 
+from core import feasibility as _feas
 from core import load
 from core.types import (
     AbsorberOption,
@@ -51,7 +52,8 @@ def assess(projection: LoadProjection, settings: SolverSettings) -> InjuryRisk:
 
 
 def _chance_for(req: SolveRequest) -> float:
-    return chance_pct(load.project(req).peak_acwr, req.settings)
+    """Uses the same schedule-derived load series the verdict does, not a smooth ramp."""
+    return chance_pct(_feas.evaluate(req)["load"].peak_acwr, req.settings)
 
 
 def _with_hours(req: SolveRequest, hours: float) -> SolveRequest:

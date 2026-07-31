@@ -81,6 +81,10 @@ export interface DayCell {
   discipline: 'swim' | 'bike' | 'run' | null
   is_long: boolean
   load: number
+  duration_s: number
+  distance_m: number
+  intensity_factor: number
+  session_kind: 'endurance' | 'threshold' | 'rest'
   is_blackout: boolean
   is_race: boolean
 }
@@ -90,6 +94,7 @@ export interface ScheduleGrid {
   cells: DayCell[]
   peak_day_load: number
   weekly_stress: number[]
+  unabsorbed_hours: number
   unabsorbed_stress: number
   blackout_weeks: number[]
 }
