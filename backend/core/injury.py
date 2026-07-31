@@ -44,6 +44,9 @@ def chance_pct(peak_acwr: float, settings: SolverSettings) -> float:
 def assess(projection: LoadProjection, settings: SolverSettings) -> InjuryRisk:
     return InjuryRisk(
         chance_pct=chance_pct(projection.peak_acwr, settings),
+        # Band boundaries expressed as chances, so the meter can live on the same scale
+        # as the headline figure instead of mixing ratio and percentage units.
+        moderate_chance_pct=chance_pct(0.85 * settings.acwr_flag_threshold, settings),
         # Target for the inverse solve: chance is monotone in ACWR, so "get the ratio
         # under the threshold" and "get the chance under this figure" are the same ask.
         threshold_chance_pct=chance_pct(settings.acwr_flag_threshold, settings),

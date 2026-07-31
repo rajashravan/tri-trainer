@@ -11,17 +11,10 @@ interface Props {
   onAbsorb: (option: AbsorberOption) => void
 }
 
-/** Meter domain. Fixed so the marker moves as the ratio changes, not the scale. */
-const LO = 0.8
-const HI = 2.0
+/** Meter domain in percentage points, matching the headline figure's units. */
+const HI = 60
 
-const pos = (v: number) => ((Math.min(HI, Math.max(LO, v)) - LO) / (HI - LO)) * 100
-
-function band(ratio: number, threshold: number): { label: string; tone: string } {
-  if (ratio >= threshold) return { label: 'Elevated', tone: 'over' }
-  if (ratio >= threshold * 0.85) return { label: 'Moderate', tone: 'caution' }
-  return { label: 'Low', tone: 'safe' }
-}
+const pos = (v: number) => (Math.min(HI, Math.max(0, v)) / HI) * 100
 
 export default function InjuryPanel({
   injury,
@@ -32,74 +25,65 @@ export default function InjuryPanel({
   onClear,
   onAbsorb,
 }: Props) {
-  const { peak_acwr: ratio, threshold_acwr: threshold } = injury
-  const { label, tone } = band(ratio, threshold)
+  const chance = injury.chance_pct
+  const moderateFrom = injury.moderate_chance_pct
+  const elevatedFrom = injury.threshold_chance_pct
+
+  const { label, tone } =
+    chance >= elevatedFrom
+      ? { label: 'Elevated', tone: 'over' }
+      : chance >= moderateFrom
+        ? { label: 'Moderate', tone: 'caution' }
+        : { label: 'Low', tone: 'safe' }
 
   return (
     <section className={`panel injury ${tone}`}>
       <div className="panel-head">
-        <h2>Load ratio</h2>
+        <h2>Injury chance</h2>
         <span className={`band-chip ${tone}`}>{label}</span>
       </div>
 
+      {/* Neutral, not green: colour beside the word "injury" reads as reassurance the
+          model cannot honestly give. The meter and chip carry the status instead. */}
       <div className="ratio-headline">
-        <span className="ratio-value">{ratio.toFixed(2)}</span>
-        <span className="ratio-vs">/ {threshold.toFixed(2)} threshold</span>
+        <span className="ratio-value">{chance.toFixed(0)}%</span>
+        <span className="ratio-vs">over this {load.weekly_acwr.length}-week block</span>
       </div>
-      <p className="ratio-what">
-        Peak acute:chronic training load — how sharply this plan ramps, against the line
-        you set.
-      </p>
 
-      {/* Read-only. Deliberately no thumb, no hover, no pointer cursor: this is a
-          derived output, not something the athlete gets to set. */}
-      <div className="meter" role="img"
-        aria-label={`Peak acute to chronic ratio ${ratio.toFixed(2)} against a threshold of ${threshold.toFixed(2)}: ${label}`}>
+      {/* Read-only: a derived output, not something the athlete sets. */}
+      <div
+        className="meter"
+        role="img"
+        aria-label={`Modelled injury chance ${chance.toFixed(0)} percent: ${label}`}
+      >
         <div className="meter-track">
-          <span className="zone safe" style={{ width: `${pos(threshold * 0.85)}%` }} />
+          <span className="zone safe" style={{ width: `${pos(moderateFrom)}%` }} />
           <span
             className="zone caution"
-            style={{ width: `${pos(threshold) - pos(threshold * 0.85)}%` }}
+            style={{ width: `${pos(elevatedFrom) - pos(moderateFrom)}%` }}
           />
-          <span className="zone over" style={{ width: `${100 - pos(threshold)}%` }} />
-          <span className="meter-threshold" style={{ left: `${pos(threshold)}%` }} />
-          <span className={`meter-marker ${tone}`} style={{ left: `${pos(ratio)}%` }} />
+          <span className="zone over" style={{ width: `${100 - pos(elevatedFrom)}%` }} />
+          <span className="meter-threshold" style={{ left: `${pos(elevatedFrom)}%` }} />
+          <span className={`meter-marker ${tone}`} style={{ left: `${pos(chance)}%` }} />
         </div>
         <div className="meter-scale">
-          <span style={{ left: '0%' }}>{LO.toFixed(1)}</span>
-          <span className="at-threshold" style={{ left: `${pos(threshold)}%` }}>
-            {threshold.toFixed(2)}
+          <span style={{ left: '0%' }}>0%</span>
+          <span className="at-threshold" style={{ left: `${pos(elevatedFrom)}%` }}>
+            your line
           </span>
-          <span style={{ left: '100%' }}>{HI.toFixed(1)}</span>
+          <span style={{ left: '100%' }}>{HI}%</span>
         </div>
       </div>
 
-      <div className="ratio-meta">
-        <div>
-          <span>ramp rate</span>
-          <strong>{load.peak_weekly_ctl_ramp.toFixed(1)} CTL/week</strong>
-        </div>
-        <div>
-          <span>weeks above your line</span>
-          <strong>
-            {injury.weeks_above_threshold} of {load.weekly_acwr.length}
-          </strong>
-        </div>
-        <div>
-          <span>modelled injury chance</span>
-          <strong className="muted-figure">{injury.chance_pct.toFixed(0)}%</strong>
-        </div>
-      </div>
-
-      {/* Inverse query — a button, not a slider: the ratio is an output, so the only
+      {/* Inverse query — a button, not a slider: the figure is an output, so the only
           honest interaction is asking what would move it. */}
       <div className="ratio-actions">
-        {ratio >= threshold ? (
+        {chance >= elevatedFrom ? (
           <button className="ghost-btn solve-btn" onClick={onSolve} disabled={solving}>
             {solving ? 'Solving…' : 'Solve for lower risk'}
           </button>
         ) : (
-          <span className="ratio-ok">Ratio is under your threshold.</span>
+          <span className="ratio-ok">Under the line you set.</span>
         )}
         {solving && (
           <button className="link-btn" onClick={onClear}>
@@ -112,13 +96,11 @@ export default function InjuryPanel({
         <div className="ratio-solved">
           {absorbers.length === 0 ? (
             <p className="absorb-none">
-              No single change to weeks or hours brings the ratio under {threshold.toFixed(2)}.
+              No single change to weeks or hours brings this down.
             </p>
           ) : (
             <>
-              <p className="absorb-lead">
-                To get under {threshold.toFixed(2)}, change one of these:
-              </p>
+              <p className="absorb-lead">To lower it, change one of these:</p>
               <div className="relax-row">
                 {absorbers.map((a) => (
                   <RelaxationCard
@@ -133,7 +115,7 @@ export default function InjuryPanel({
               </div>
               <p className="ratio-note">
                 Your goal time is absent on purpose — it does not change training load, so
-                it cannot move this ratio.
+                it cannot move this figure.
               </p>
             </>
           )}

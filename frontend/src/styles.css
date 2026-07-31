@@ -876,21 +876,6 @@ body {
 
 .meter-scale .at-threshold { color: var(--ink); font-weight: 650; }
 
-.ratio-meta { display: flex; gap: 34px; flex-wrap: wrap; }
-
-.ratio-meta > div { display: flex; flex-direction: column; gap: 3px; }
-
-.ratio-meta span {
-  font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--ink-3);
-  font-weight: 650;
-}
-
-.ratio-meta strong { font-size: 15px; font-variant-numeric: tabular-nums; }
-.ratio-meta .muted-figure { color: var(--ink-2); font-weight: 600; }
-
 .injury-caveat {
   margin: 16px 0 0;
   font-size: 11.5px;

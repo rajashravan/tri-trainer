@@ -186,6 +186,7 @@ class LoadProjection:
 @dataclass(frozen=True)
 class InjuryRisk:
     chance_pct: float
+    moderate_chance_pct: float      # band boundary: chance at 0.85x the threshold ratio
     threshold_chance_pct: float     # what the curve reads exactly at the threshold
     peak_acwr: float
     threshold_acwr: float

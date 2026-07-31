@@ -48,6 +48,7 @@ export interface LoadProjection {
 
 export interface InjuryRisk {
   chance_pct: number
+  moderate_chance_pct: number
   threshold_chance_pct: number
   peak_acwr: number
   threshold_acwr: number
