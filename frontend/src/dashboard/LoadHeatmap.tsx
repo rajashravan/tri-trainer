@@ -14,6 +14,14 @@ interface Props {
 const LEVELS = 5
 const TOOLTIP_W = 216
 
+// Cell size bounds. Without a cap, `repeat(N, 1fr)` stretches columns to fill the panel,
+// so a short block renders enormous squares; without a floor, a long block would render
+// unclickable slivers. Capping total width caps each cell, and the floor lets the grid
+// overflow into a scroll rather than collapse.
+const CELL_MAX = 42
+const CELL_MIN = 11
+const CELL_GAP = 3
+
 const key = (w: number, d: number) => `${w}:${d}`
 
 function distanceLabel(cell: DayCell): string {
@@ -91,7 +99,13 @@ export default function LoadHeatmap({ grid, blackouts, goalFinishS, onBlackouts 
             <span key={n}>{n}</span>
           ))}
         </div>
-        <div className="heat-grid" style={{ gridTemplateColumns: `repeat(${grid.weeks}, 1fr)` }}>
+        <div
+          className="heat-grid"
+          style={{
+            gridTemplateColumns: `repeat(${grid.weeks}, minmax(${CELL_MIN}px, 1fr))`,
+            maxWidth: grid.weeks * CELL_MAX + (grid.weeks - 1) * CELL_GAP,
+          }}
+        >
           {Array.from({ length: grid.weeks }, (_, w) => (
             <div className="heat-col" key={w}>
               {Array.from({ length: 7 }, (_, d) => {
@@ -166,7 +180,10 @@ export default function LoadHeatmap({ grid, blackouts, goalFinishS, onBlackouts 
           </div>
         )}
 
-        <div className="heat-weeks">
+        <div
+          className="heat-weeks"
+          style={{ maxWidth: grid.weeks * CELL_MAX + (grid.weeks - 1) * CELL_GAP }}
+        >
           <span>week 1</span>
           <span>race</span>
         </div>
