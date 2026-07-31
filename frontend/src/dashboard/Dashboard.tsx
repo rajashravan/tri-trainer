@@ -225,17 +225,6 @@ export default function Dashboard({ request, onApply, onBack }: Props) {
         onAbsorb={absorb}
       />
 
-      {result.warnings.length > 0 && (
-        <section className="panel warnings">
-          <h2>Model caveats</h2>
-          <ul>
-            {result.warnings.map((w) => (
-              <li key={w}>{w}</li>
-            ))}
-          </ul>
-        </section>
-      )}
-
       <footer className="dash-foot">
         <button className="ghost-btn" onClick={onBack}>
           Back to onboarding
