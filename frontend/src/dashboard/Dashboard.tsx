@@ -9,7 +9,7 @@ import RelaxationCard from './RelaxationCard'
 import { useSolver } from '../useSolver'
 import { formatClock, formatDuration } from '../format'
 import { VERDICT_LABEL, type AbsorberOption } from '../solveTypes'
-import { DISCIPLINE_LABEL, type SolveRequest } from '../types'
+import { DISCIPLINES, DISCIPLINE_LABEL, type SolveRequest } from '../types'
 
 interface Props {
   request: SolveRequest
@@ -76,6 +76,12 @@ export default function Dashboard({ request, onApply, onBack }: Props) {
     return <div className="dash dash-loading">Solving…</div>
   }
 
+  // Hours allocated to a sport that has no day in the template are never trained.
+  const present = new Set(request.week_template.days.map((d) => d.discipline))
+  const orphaned = DISCIPLINES.filter(
+    (d) => request.allocation[`${d}_h`] > 0.01 && !present.has(d),
+  )
+
   const applyRelaxation = (control: string, delta: number) => {
     if (control === 'weeks') {
       onApply({ weeks_until_race: request.weeks_until_race + delta })
@@ -127,6 +133,13 @@ export default function Dashboard({ request, onApply, onBack }: Props) {
         goal={request.goal}
         onGoal={(goal) => onApply({ goal })}
       />
+
+      {error && (
+        <div className="stale-banner">
+          <strong>Not solving.</strong> {error} — the figures below are from your last
+          valid plan.
+        </div>
+      )}
 
       {/* ② Relaxation options + ④ sensitivity hint */}
       {result.relaxations.length > 0 && (
@@ -200,6 +213,8 @@ export default function Dashboard({ request, onApply, onBack }: Props) {
       <WeekTemplateEditor
         template={request.week_template}
         recovery={result.recovery}
+        orphaned={orphaned}
+        allocation={request.allocation}
         onChange={(week_template) => onApply({ week_template })}
       />
 

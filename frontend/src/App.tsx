@@ -23,6 +23,27 @@ function resplitGoal(req: SolveRequest, total_s: number): SolveRequest['goal'] {
   }
 }
 
+/**
+ * The backend requires the allocation to sum to the weekly budget. Enforced here, at the
+ * one funnel every state change passes through, so no individual control can violate it
+ * — the onboarding hours field previously set the budget without rescaling and produced
+ * a 422. Rescaling proportionally preserves the athlete's chosen split.
+ */
+function normalizeAllocation(req: SolveRequest): SolveRequest {
+  const { swim_h, bike_h, run_h } = req.allocation
+  const budget = req.weekly_hours_available
+  const sum = swim_h + bike_h + run_h
+  if (Math.abs(sum - budget) < 1e-6) return req
+  const k = budget / sum
+  return {
+    ...req,
+    allocation:
+      sum > 0
+        ? { swim_h: swim_h * k, bike_h: bike_h * k, run_h: run_h * k }
+        : { swim_h: budget / 3, bike_h: budget / 3, run_h: budget / 3 },
+  }
+}
+
 export default function App() {
   const [request, setRequest] = useState<SolveRequest>(DEFAULT_REQUEST)
   const [onboarded, setOnboarded] = useState(false)
@@ -36,7 +57,7 @@ export default function App() {
       if (p.race && p.race !== prev.race) {
         next.goal = resplitGoal(next, next.goal.total_s)
       }
-      return next
+      return normalizeAllocation(next)
     })
 
   if (!onboarded) {

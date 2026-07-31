@@ -55,13 +55,6 @@ export default function StepProfile({ profile, onChange }: Props) {
         </label>
       </div>
 
-      <div className="callout">
-        <strong>Honest note.</strong> Height, weight and sex do not feed this model. Your own
-        time-trial data already encodes your current capability, so layering population averages
-        on top would double-count. Age is used in one place only — a mild adjustment to how fast
-        you can improve.
-      </div>
-
       <label className="field wide emphasis">
         <span>
           Current training hours per week
