@@ -120,15 +120,22 @@ response carries a fixed note string:
 How hours + weeks become improvement. Saturating exponential with a headroom ceiling:
 
 ```
-stimulus_d      = hours_d * weeks
+stimulus_d      = hours_d * weeks ** weeks_exponent            # weeks_exponent = 0.85
 g_d             = g_max_d * (1 - exp(-stimulus_d / tau_d))     # fractional SPEED gain
 ```
 
-- `tau_d` — stimulus constant, hours·weeks to reach 63% of ceiling.
-  Defaults: swim `55`, bike `90`, run `70`.
+**Why the exponent on weeks.** A plain `hours * weeks` product makes the two controls
+mathematically interchangeable: scaling either by 1.75 produces an identical result,
+so `+12 weeks` and `+6 h/week` return the *same* projected finish and the relaxation
+search picks arbitrarily between two identical levers. The sub-linear exponent encodes
+that extending a block has diminishing returns relative to raising weekly volume, and
+keeps the axes distinguishable. Locked by a regression test.
+
+- `tau_d` — stimulus constant to reach 63% of ceiling.
+  Defaults: swim `26`, bike `73`, run `46`.
 - `g_max_d` — ceiling on fractional speed gain over the block:
   `g_max_d = g_ceiling_d * headroom_factor * age_factor`
-  - `g_ceiling_d`: swim `0.18`, bike `0.12`, run `0.10` (swim is most
+  - `g_ceiling_d`: swim `0.20`, bike `0.15`, run `0.13` (swim is most
     technique-limited and therefore has the most upside for an untrained swimmer).
   - `headroom_factor = clamp(1 - CTL_0 / ctl_reference_d, 0.25, 1.0)` — an athlete
     already carrying high chronic load has less left to gain.
@@ -173,6 +180,19 @@ three to make the model look richer.**
 | full | 3800 | 180000 | 42200 | 600 |
 
 Projected finish = Σ per-discipline projected times + `transition_s`.
+
+**Run-off-the-bike penalty.** The run split is predicted from standalone road efforts,
+which is systematically optimistic — a triathlon run is materially slower than the same
+athlete's open half-marathon. Applied as a multiplier on the run leg only:
+
+```
+run_time *= (1 + tri_run_penalty_frac)        # default 0.06
+```
+
+Treated exactly like the ACWR threshold: **visible, user-adjustable in the model
+assumptions drawer, and labeled a heuristic.** The 6% figure is a reasonable
+half-distance estimate, not a validated constant. It is applied to the *predicted
+current* time, so it shifts the baseline rather than the improvement math.
 
 ---
 
@@ -221,10 +241,12 @@ class SolverSettings:
     acwr_flag_threshold: float = 1.5
     max_weekly_ctl_ramp: float = 8.0
     tight_margin_frac: float = 0.02
+    tri_run_penalty_frac: float = 0.06    # run-off-the-bike; heuristic, user-adjustable
+    weeks_exponent: float = 0.85          # keeps weeks and hours from collapsing into one lever
     riegel_k_default: dict[str, float] = field(default_factory=lambda: {"swim": 1.03, "bike": 1.05, "run": 1.06})
     mean_intensity_factor: dict[str, float] = field(default_factory=lambda: {"swim": 0.78, "bike": 0.75, "run": 0.80})
-    tau: dict[str, float] = field(default_factory=lambda: {"swim": 55.0, "bike": 90.0, "run": 70.0})
-    g_ceiling: dict[str, float] = field(default_factory=lambda: {"swim": 0.18, "bike": 0.12, "run": 0.10})
+    tau: dict[str, float] = field(default_factory=lambda: {"swim": 26.0, "bike": 73.0, "run": 46.0})
+    g_ceiling: dict[str, float] = field(default_factory=lambda: {"swim": 0.20, "bike": 0.15, "run": 0.13})
     ctl_reference: dict[str, float] = field(default_factory=lambda: {"swim": 45.0, "bike": 75.0, "run": 60.0})
 
 @dataclass(frozen=True)
@@ -337,8 +359,9 @@ Pydantic models, validates, calls `core.solve.solve()`, returns.
   "weeks_until_race": 16,
   "weekly_hours_available": 8.0,
   "allocation": {"swim_h": 1.5, "bike_h": 4.0, "run_h": 2.5},
-  "goal": {"total_s": 18000, "swim_s": 2000, "bike_s": 9900, "run_s": 5620},
-  "settings": {"acwr_flag_threshold": 1.5, "max_weekly_ctl_ramp": 8.0}
+  "goal": {"total_s": 18000, "swim_s": 1946, "bike_s": 9600, "run_s": 5974},
+  "settings": {"acwr_flag_threshold": 1.5, "max_weekly_ctl_ramp": 8.0,
+               "tri_run_penalty_frac": 0.06}
 }
 ```
 
@@ -350,10 +373,10 @@ Pydantic models, validates, calls `core.solve.solve()`, returns.
 {
   "verdict": "infeasible",
   "binding_constraint": "run_headroom",
-  "binding_explanation": "Run requires a 9.9% improvement; 4.1% is plausible in 16 weeks at 2.5 h/week.",
-  "projected_finish_s": 18742.0,
+  "binding_explanation": "Run requires a 9.6% improvement; 4.1% is plausible in 16 weeks at 2.5 h/week.",
+  "projected_finish_s": 19080.0,
   "goal_finish_s": 18000.0,
-  "margin_s": -742.0,
+  "margin_s": -1080.0,
   "models": [
     {"discipline": "swim", "critical_speed_mps": 0.873, "d_prime_m": 33.3,
      "riegel_k": 1.049, "fit_source": "critical_speed", "k_was_clamped": false,
@@ -361,10 +384,10 @@ Pydantic models, validates, calls `core.solve.solve()`, returns.
                    "z4": [0.829, 0.890], "z5": [0.890, 1.400]}}
   ],
   "predictions": [
-    {"discipline": "run", "predicted_current_s": 6236.0, "goal_s": 5620.0,
-     "projected_s": 5980.0, "required_time_reduction_pct": 9.88,
-     "plausible_time_reduction_pct": 4.10, "headroom_pct": -5.78,
-     "allocated_hours": 2.5, "share_of_projected_time_pct": 31.9, "is_binding": true}
+    {"discipline": "run", "predicted_current_s": 6610.0, "goal_s": 5974.0,
+     "projected_s": 6339.0, "required_time_reduction_pct": 9.62,
+     "plausible_time_reduction_pct": 4.10, "headroom_pct": -5.52,
+     "allocated_hours": 2.5, "share_of_projected_time_pct": 33.2, "is_binding": true}
   ],
   "load": {
     "weekly_ctl": [52.1, 55.3], "weekly_atl": [54.0, 61.2], "weekly_acwr": [1.04, 1.11],
@@ -386,7 +409,7 @@ Pydantic models, validates, calls `core.solve.solve()`, returns.
   "snap_target": { "...": "a complete SolveRequest with cheapest_fix applied" },
   "plan": [{"week_index": 1, "swim_h": 1.4, "bike_h": 3.7, "run_h": 2.3,
             "target_ctl": 52.1, "focus": "base"}],
-  "warnings": ["Run split is modeled as a standalone road time; triathlon run-off-the-bike fatigue is not modeled."]
+  "warnings": ["Bike efforts of 36 and 75 min fall outside the 2-15 min window where the critical-speed model is valid; CS may be underestimated."]
 }
 ```
 
@@ -430,6 +453,7 @@ function evaluate(req) -> SolveResponse:
 
     # 2. Current predicted race split
     for d: current[d] = predict_time(model[d], k[d], race_distance[d])
+    current[run] *= (1 + settings.tri_run_penalty_frac)      # run off the bike
 
     # 3. Load projection over the block
     stress[d]  = 100 * allocation[d] * IF[d]^2
@@ -526,6 +550,14 @@ function absorbers_for(delta, alloc, budget):
 # 2+ absorbers -> prompt the user to pick, then apply
 ```
 
+**Prompting fires on drag-end, never mid-drag.** Both aggregate sliders are continuous
+and all three disciplines can usually absorb, so a literal reading of rule 3 would open
+a modal on every animation frame of the primary control. Instead: during the drag,
+preview the delta distributed proportionally so the verdict updates live; on
+`pointerup`, if 2+ absorbers exist, open the absorber popover and commit the user's
+choice. One prompt per gesture. If the user dismisses it, the proportional preview
+stands.
+
 ---
 
 ## 6. Interaction rules
@@ -555,7 +587,9 @@ Exploring how far off you are is the point of the tool; blocking it would destro
 ### 6.3 Aggregate control → absorb
 
 Per §5.3: 1 absorber auto-applies with a 250ms highlight animation on the moving
-component; 2+ absorbers open a small absorber-choice popover; 0 absorbers rejects.
+component; 2+ absorbers open a small absorber-choice popover **on drag-end only**;
+0 absorbers rejects. Mid-drag the delta is previewed proportionally so the verdict
+stays live under the cursor.
 
 ### 6.4 Allocation is zero-sum
 
@@ -646,10 +680,18 @@ available, allocation 1.5 / 4.0 / 2.5, goal **5:00:00**.
 | Run | 5km / 22:30 | 10km / 47:00 | 3.40 m/s | 1.063 |
 
 These fit realistically (`D'` = 33.3m / 1538.5m / 408.2m, all in normal ranges; run `k`
-lands at 1.063 against the textbook 1.06). Predicted current half-IM split =
-35:53 + 2:57:00 + 1:43:56 + 8:00 transition = **5:24:49** (verified numerically).
+lands at 1.063 against the textbook 1.06). Predicted current half-IM split, **including
+the 6% run-off-the-bike penalty** (1:43:56 standalone → 1:50:10 off the bike):
 
-**The goal is deliberately seeded at 5:00:00 — 7.64% short.** The app therefore
+`35:53 + 2:57:00 + 1:50:10 + 8:00 transition = ` **`5:31:03`** (verified numerically).
+
+**The goal is seeded at 5:12:00**, chosen by measurement rather than taste. The
+athlete's reachable band under the relaxation grid is **5:04:57 … 5:16:12**; a goal
+above `max(weeks-only, hours-only)` is the condition for all three axes to offer a
+real fix. 5:12:00 opens `infeasible` at −4:12 and yields exactly three options —
+`+10 weeks`, `+3.75 h/week`, `goal 5 min slower` — which is the demo state §2 promises.
+A 5:00:00 goal is reachable by *no* combination of weeks and hours, so the panel would
+show a single option. Proportional split: swim 33:46, bike 2:46:34, run 1:43:40. The app therefore
 opens in a `tight`/`infeasible` state with live relaxation options, demonstrating the
 core value proposition on first paint. Opening on "feasible, you're fine" would
 demo nothing.
@@ -665,10 +707,11 @@ Flagged rather than invented:
    This is the single biggest source of modeling error, and the number the whole
    verdict rests on. Isolated in one module for exactly this reason. Should the UI
    present a confidence band rather than a point estimate?
-2. **Run-off-the-bike fatigue is not modeled.** The run split is predicted as a
-   standalone road time; real triathlon runs are materially slower. A fixed penalty
-   (~5–8% for a half) would improve realism, but the coefficient is a guess. Currently
-   emitted as a `warning` string instead. Should it be a settings-exposed multiplier?
+2. ~~Run-off-the-bike fatigue is not modeled.~~ **Resolved:** modeled as a 6%
+   multiplier on the run leg, user-adjustable in the assumptions drawer. The
+   coefficient remains a guess — it is a plausible half-distance figure, not a
+   validated one, and it scales with race distance in reality (a full-distance run
+   degrades far more than 6%). Open sub-question: should the default vary by race?
 3. **CS fit is biased by effort duration.** The two-parameter model assumes efforts in
    roughly the 2–15 minute range. Our seeded bike efforts (36 and 75 minutes) are well
    outside it, which biases CS low and `D'` high. Should we warn when supplied efforts
@@ -683,6 +726,12 @@ Flagged rather than invented:
 6. **Hard ramp cap of 8.0 CTL/week** is a commonly cited figure, not a validated one.
    It is the *hard* constraint, so it directly gates infeasibility verdicts — it
    deserves more scrutiny than the soft ACWR flag that carries the caveat text.
-7. **Seeding `CTL_0` from `current_weekly_hours`** assumes the athlete's recent
+7. **The improvement frontier is narrow.** Across the entire relaxation grid this
+   athlete spans only ~11 minutes (5:16:12 → 5:04:57). That is arguably the honest
+   output of a saturating model with realistic ceilings — nearly doubling training does
+   not halve your race time — but it does mean the controls have modest leverage. A
+   wider span would require either implausible improvement ceilings or abandoning
+   diminishing returns. Flagged rather than tuned away.
+8. **Seeding `CTL_0` from `current_weekly_hours`** assumes the athlete's recent
    training resembles their planned allocation. For someone returning from a layoff
    this materially overstates starting fitness.
