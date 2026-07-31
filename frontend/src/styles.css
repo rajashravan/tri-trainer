@@ -1109,27 +1109,82 @@ body {
   white-space: nowrap;
 }
 
+/* Aligned to the same 74px gutter as the bars above, so the control group reads as a
+   continuation of the GOAL row rather than a free-floating set of sliders. */
 .split-legs {
-  margin-top: 18px;
+  margin-top: 14px;
   padding-top: 16px;
   border-top: 1px solid var(--line);
   display: grid;
-  gap: 9px;
+  grid-template-columns: 74px 1fr;
+  gap: 12px;
 }
 
+.legs-tag {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-self: start;
+  padding-top: 20px;
+}
+
+.legs-tag em {
+  font-style: normal;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+  text-transform: none;
+}
+
+.legs-body {
+  background: #f7f8f5;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 10px 14px 12px;
+}
+
+.legs-head,
 .split-leg {
   display: grid;
-  grid-template-columns: 10px 44px 1fr 62px;
+  grid-template-columns: 78px 1fr 66px 66px;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
-.split-leg input[type='range'] { width: 100%; accent-color: var(--ink); cursor: pointer; }
+.legs-head span {
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  color: var(--ink-3);
+  text-align: right;
+}
 
-.leg-name { font-size: 12.5px; color: var(--ink-2); }
+.split-leg { margin-top: 7px; }
+
+.leg-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+
+.leg-range { width: 100%; cursor: pointer; }
+.leg-range.swim { accent-color: #2f7fb5; }
+.leg-range.bike { accent-color: #1a6b4f; }
+.leg-range.run  { accent-color: #b4531a; }
+
+.leg-goal {
+  text-align: right;
+  font-size: 14px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
 
 .leg-delta {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 650;
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -1138,7 +1193,7 @@ body {
 .leg-delta.over { color: #c5221f; }
 .leg-delta.under { color: #0b6b3c; }
 
-.split-help { margin: 12px 0 0; font-size: 12.5px; color: var(--ink-3); }
+.split-help { margin: 12px 0 0; font-size: 12px; color: var(--ink-3); }
 
 /* ---- day session popup ---- */
 

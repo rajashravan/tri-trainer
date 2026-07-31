@@ -107,33 +107,53 @@ export default function SplitBar({ result, goal, onGoal }: Props) {
       </div>
 
       <div className="split-legs">
-        {DISCIPLINES.map((d) => {
-          const over = projectedBy[d] - goal[`${d}_s`]
-          return (
-            <div className="split-leg" key={d}>
-              <span className={`swatch ${d}`} />
-              <span className="leg-name">{DISCIPLINE_LABEL[d]}</span>
-              <input
-                type="range"
-                min={60}
-                max={goalLegs - 120}
-                step={30}
-                value={goal[`${d}_s`]}
-                onChange={(e) => setLeg(d, Number(e.target.value))}
-                aria-label={`${DISCIPLINE_LABEL[d]} goal split`}
-              />
-              <span className={`leg-delta ${over > 0 ? 'over' : 'under'}`}>
-                {over > 0 ? '+' : '−'}
-                {formatDuration(Math.abs(over))}
-              </span>
-            </div>
-          )
-        })}
+        <span className="split-tag goal legs-tag">
+          Goal split
+          <em>drag to edit</em>
+        </span>
+
+        <div className="legs-body">
+          <div className="legs-head">
+            <span />
+            <span />
+            <span>goal time</span>
+            <span>vs projected</span>
+          </div>
+
+          {DISCIPLINES.map((d) => {
+            const over = projectedBy[d] - goal[`${d}_s`]
+            return (
+              <div className="split-leg" key={d}>
+                <span className="leg-name">
+                  <span className={`swatch ${d}`} />
+                  {DISCIPLINE_LABEL[d]}
+                </span>
+                <input
+                  className={`leg-range ${d}`}
+                  type="range"
+                  min={60}
+                  max={goalLegs - 120}
+                  step={30}
+                  value={goal[`${d}_s`]}
+                  onChange={(e) => setLeg(d, Number(e.target.value))}
+                  aria-label={`${DISCIPLINE_LABEL[d]} goal split`}
+                />
+                <span className="leg-goal">{formatDuration(goal[`${d}_s`])}</span>
+                <span className={`leg-delta ${over > 0 ? 'over' : 'under'}`}>
+                  {over > 0 ? '+' : '−'}
+                  {formatDuration(Math.abs(over))}
+                </span>
+              </div>
+            )
+          })}
+
+          <p className="split-help">
+            Zero-sum against a fixed {formatClock(goal.total_s)} total — a slower bike split
+            has to come out of the swim or the run.
+          </p>
+        </div>
       </div>
-      <p className="split-help">
-        Drag to move time between legs. The total goal stays fixed — this is zero-sum, so
-        buying yourself a slower bike split costs you elsewhere.
-      </p>
+
     </section>
   )
 }
