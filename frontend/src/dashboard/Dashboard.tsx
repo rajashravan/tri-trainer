@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import ControlRail from './ControlRail'
 import InjuryPanel from './InjuryPanel'
 import WeekTemplateEditor from './WeekTemplateEditor'
 import LoadHeatmap from './LoadHeatmap'
 import SplitBar from './SplitBar'
+import DayIcon from './DayIcon'
 import { useSolver } from '../useSolver'
 import { formatClock, formatDuration } from '../format'
 import { VERDICT_LABEL, type AbsorberOption } from '../solveTypes'
@@ -19,6 +20,18 @@ const signed = (s: number) => `${s >= 0 ? '+' : '−'}${formatDuration(Math.abs(
 
 export default function Dashboard({ request, onApply, onBack }: Props) {
   const [injuryTarget, setInjuryTarget] = useState<number | null>(null)
+  const [stuck, setStuck] = useState(false)
+  // Callback ref, not useRef: the sentinel only mounts after the first solve resolves,
+  // so an effect keyed on [] would run while it is still null and never attach.
+  const [sentinel, setSentinel] = useState<HTMLDivElement | null>(null)
+
+  // Collapse the verdict banner into a compact bar once it would scroll off.
+  useEffect(() => {
+    if (!sentinel) return
+    const obs = new IntersectionObserver(([entry]) => setStuck(!entry.isIntersecting))
+    obs.observe(sentinel)
+    return () => obs.disconnect()
+  }, [sentinel])
   const payload = useMemo(
     () => ({ ...request, injury_target_pct: injuryTarget }),
     [request, injuryTarget],
@@ -87,8 +100,9 @@ export default function Dashboard({ request, onApply, onBack }: Props) {
     <div className={`dash${pending ? ' pending' : ''}`}>
       <ControlRail request={request} onChange={onApply} />
       <div className="dash-main">
-      {/* ① Verdict — readable across a room */}
-      <section className={`verdict-banner ${result.verdict}`}>
+      {/* ① Verdict — readable across a room, and pinned once you scroll past it */}
+      <div ref={setSentinel} className="verdict-sentinel" />
+      <section className={`verdict-banner ${result.verdict}${stuck ? ' stuck' : ''}`}>
         <div className="verdict-word">{VERDICT_LABEL[result.verdict]}</div>
         <div className="verdict-line">{result.binding_explanation}</div>
         <div className="verdict-nums">
@@ -148,7 +162,7 @@ export default function Dashboard({ request, onApply, onBack }: Props) {
 
       {/* Per-discipline breakdown */}
       <section className="panel">
-        <h2>Where the time is, and where the headroom is</h2>
+        <h2>What each leg still needs</h2>
         <table className="pred-table">
           <thead>
             <tr>
@@ -157,30 +171,34 @@ export default function Dashboard({ request, onApply, onBack }: Props) {
               <th>Projected</th>
               <th>Goal</th>
               <th>Needs</th>
-              <th>Plausible</th>
-              <th>Headroom</th>
-              <th>Hours</th>
             </tr>
           </thead>
           <tbody>
-            {result.predictions.map((p) => (
-              <tr key={p.discipline} className={p.is_binding ? 'binding' : ''}>
-                <td>
-                  {DISCIPLINE_LABEL[p.discipline]}
-                  {p.is_binding && <span className="binding-tag">binding</span>}
-                </td>
-                <td>{formatDuration(p.predicted_current_s)}</td>
-                <td>{formatDuration(p.projected_s)}</td>
-                <td>{formatDuration(p.goal_s)}</td>
-                <td>{p.required_time_reduction_pct.toFixed(1)}%</td>
-                <td>{p.plausible_time_reduction_pct.toFixed(1)}%</td>
-                <td className={p.headroom_pct < 0 ? 'neg' : 'pos'}>
-                  {p.headroom_pct > 0 ? '+' : ''}
-                  {p.headroom_pct.toFixed(1)}%
-                </td>
-                <td>{p.allocated_hours.toFixed(1)}</td>
-              </tr>
-            ))}
+            {result.predictions.map((p) => {
+              // What the plan still leaves on the table: projected against goal.
+              // Negative means the projection already beats the goal split.
+              const needs = p.projected_s - p.goal_s
+              return (
+                <tr key={p.discipline} className={p.is_binding ? 'binding' : ''}>
+                  <td>
+                    <span className="pred-sport">
+                      <span className={`sport-chip ${p.discipline}`}>
+                        <DayIcon discipline={p.discipline} />
+                      </span>
+                      {DISCIPLINE_LABEL[p.discipline]}
+                      {p.is_binding && <span className="binding-tag">binding</span>}
+                    </span>
+                  </td>
+                  <td>{formatDuration(p.predicted_current_s)}</td>
+                  <td>{formatDuration(p.projected_s)}</td>
+                  <td>{formatDuration(p.goal_s)}</td>
+                  <td className={needs > 0 ? 'needs-gap' : 'needs-ok'}>
+                    {needs > 0 ? '+' : '−'}
+                    {formatDuration(Math.abs(needs))}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </section>

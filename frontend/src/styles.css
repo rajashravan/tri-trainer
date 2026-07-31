@@ -1246,3 +1246,70 @@ body {
 }
 
 .pop-dot { margin: 0 6px; color: var(--ink-3); }
+
+/* ---- discipline chips in the prediction table ---- */
+
+.pred-sport { display: inline-flex; align-items: center; gap: 9px; }
+
+.sport-chip {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  flex: 0 0 auto;
+}
+
+.sport-chip svg { width: 17px; height: 17px; }
+
+.sport-chip.swim { background: #eaf3f9; color: #245b7d; }
+.sport-chip.bike { background: #e9f2ee; color: #17553f; }
+.sport-chip.run  { background: #fbeee5; color: #8c400f; }
+
+.pred-table td.needs-gap { color: #c5221f; font-weight: 700; }
+.pred-table td.needs-ok  { color: #0b6b3c; font-weight: 700; }
+
+/* ---- sticky verdict ---- */
+
+.verdict-sentinel { height: 1px; margin-bottom: -1px; }
+
+.verdict-banner {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  transition: padding 0.14s ease, border-radius 0.14s ease, box-shadow 0.14s ease;
+}
+
+.verdict-banner.stuck {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  padding: 11px 22px;
+  border-radius: 0 0 14px 14px;
+  box-shadow: 0 8px 24px rgba(16, 20, 24, 0.22);
+}
+
+.verdict-banner.stuck .verdict-word {
+  font-size: 27px;
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.verdict-banner.stuck .verdict-line { display: none; }
+
+.verdict-banner.stuck .verdict-nums {
+  margin: 0;
+  padding: 0;
+  border-top: 0;
+  gap: 24px;
+  margin-left: auto;
+}
+
+.verdict-banner.stuck .verdict-nums span {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 7px;
+  font-size: 17px;
+}
+
+.verdict-banner.stuck .verdict-nums em { font-size: 9.5px; }
