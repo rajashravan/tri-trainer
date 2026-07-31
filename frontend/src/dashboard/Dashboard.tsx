@@ -3,6 +3,7 @@ import ControlRail from './ControlRail'
 import InjuryPanel from './InjuryPanel'
 import WeekTemplateEditor from './WeekTemplateEditor'
 import LoadHeatmap from './LoadHeatmap'
+import SplitBar from './SplitBar'
 import { useSolver } from '../useSolver'
 import { formatClock, formatDuration } from '../format'
 import { VERDICT_LABEL, type AbsorberOption } from '../solveTypes'
@@ -105,6 +106,12 @@ export default function Dashboard({ request, onApply, onBack }: Props) {
           </span>
         </div>
       </section>
+
+      <SplitBar
+        result={result}
+        goal={request.goal}
+        onGoal={(goal) => onApply({ goal })}
+      />
 
       {/* ② Relaxation options + ④ sensitivity hint */}
       {result.relaxations.length > 0 && (
