@@ -5,6 +5,7 @@ import WeekTemplateEditor from './WeekTemplateEditor'
 import LoadHeatmap from './LoadHeatmap'
 import SplitBar from './SplitBar'
 import DayIcon from './DayIcon'
+import RelaxationCard from './RelaxationCard'
 import { useSolver } from '../useSolver'
 import { formatClock, formatDuration } from '../format'
 import { VERDICT_LABEL, type AbsorberOption } from '../solveTypes'
@@ -140,21 +141,14 @@ export default function Dashboard({ request, onApply, onBack }: Props) {
           </div>
           <div className="relax-row">
             {result.relaxations.map((o) => (
-              <button
+              <RelaxationCard
                 key={o.control}
-                className={`relax-card${o === result.cheapest_fix ||
-                  o.control === result.cheapest_fix?.control
-                  ? ' cheapest'
-                  : ''
-                  }`}
+                human={o.human}
+                verdict={o.resulting_verdict}
+                marginS={o.resulting_margin_s}
+                highlighted={o.control === result.cheapest_fix?.control}
                 onClick={() => applyRelaxation(o.control, o.delta)}
-              >
-                <span className="relax-human">{o.human}</span>
-                <span className={`relax-verdict ${o.resulting_verdict}`}>
-                  {VERDICT_LABEL[o.resulting_verdict]}
-                </span>
-                <span className="relax-margin">{signed(o.resulting_margin_s)} vs goal</span>
-              </button>
+              />
             ))}
           </div>
         </section>
@@ -220,8 +214,9 @@ export default function Dashboard({ request, onApply, onBack }: Props) {
         injury={result.injury}
         load={result.load}
         absorbers={result.injury_absorbers}
-        target={injuryTarget}
-        onTarget={setInjuryTarget}
+        solving={injuryTarget !== null}
+        onSolve={() => setInjuryTarget(result.injury.threshold_chance_pct)}
+        onClear={() => setInjuryTarget(null)}
         onAbsorb={absorb}
       />
 

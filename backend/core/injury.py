@@ -44,6 +44,9 @@ def chance_pct(peak_acwr: float, settings: SolverSettings) -> float:
 def assess(projection: LoadProjection, settings: SolverSettings) -> InjuryRisk:
     return InjuryRisk(
         chance_pct=chance_pct(projection.peak_acwr, settings),
+        # Target for the inverse solve: chance is monotone in ACWR, so "get the ratio
+        # under the threshold" and "get the chance under this figure" are the same ask.
+        threshold_chance_pct=chance_pct(settings.acwr_flag_threshold, settings),
         peak_acwr=projection.peak_acwr,
         threshold_acwr=settings.acwr_flag_threshold,
         weeks_above_threshold=projection.weeks_above_threshold,

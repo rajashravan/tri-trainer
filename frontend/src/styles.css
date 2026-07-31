@@ -784,54 +784,103 @@ body {
 .alloc-name { font-size: 12px; color: var(--ink-2); }
 .alloc-val { font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
 
-/* ---- injury panel ---- */
+/* ---- injury panel: read-only load-ratio meter ---- */
 
 .panel.injury { border-width: 2px; }
-.panel.injury.low  { border-color: #bfe0cd; }
-.panel.injury.mid  { border-color: #e8cf9a; }
-.panel.injury.high { border-color: #eab3ae; }
+.panel.injury.safe    { border-color: #bfe0cd; }
+.panel.injury.caution { border-color: #e8cf9a; }
+.panel.injury.over    { border-color: #eab3ae; }
 
-.injury-head {
-  display: flex;
-  align-items: center;
-  gap: 32px;
-  margin-bottom: 18px;
+.band-chip {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
 }
 
-.injury-figure { display: flex; flex-direction: column; }
+.band-chip.safe    { background: #dcf0e4; color: #0b6b3c; }
+.band-chip.caution { background: #f7ecd0; color: #8a6410; }
+.band-chip.over    { background: #fadbd9; color: #a3251c; }
 
-.injury-pct {
-  font-size: 52px;
+.ratio-headline { display: flex; align-items: baseline; gap: 10px; }
+
+/* Deliberately neutral: green next to the word "injury" reads as reassurance the
+   model cannot honestly give. The meter carries the status colour instead. */
+.ratio-value {
+  font-size: 44px;
   font-weight: 700;
   line-height: 1;
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
+  color: var(--ink);
 }
 
-.injury.low .injury-pct  { color: #0f9d58; }
-.injury.mid .injury-pct  { color: #b8860b; }
-.injury.high .injury-pct { color: #d93025; }
+.ratio-vs { font-size: 15px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
 
-.injury-cap {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-weight: 650;
-  color: var(--ink-3);
-  margin-top: 4px;
-}
+.ratio-what { margin: 8px 0 20px; font-size: 13px; color: var(--ink-2); max-width: 62ch; }
 
-.injury-cap em { font-style: normal; color: var(--ink); }
+.meter { margin-bottom: 26px; cursor: default; }
 
-.injury-meta {
+.meter-track {
+  position: relative;
   display: flex;
-  gap: 28px;
-  flex-wrap: wrap;
+  height: 12px;
+  border-radius: 6px;
+  overflow: visible;
 }
 
-.injury-meta > div { display: flex; flex-direction: column; gap: 3px; }
+.zone:first-child { border-radius: 6px 0 0 6px; }
+.zone:nth-child(3) { border-radius: 0 6px 6px 0; }
 
-.injury-meta span {
+.zone.safe    { background: #cfe3d8; }
+.zone.caution { background: #f2e2bd; }
+.zone.over    { background: #f2c9c5; }
+
+.meter-threshold {
+  position: absolute;
+  top: -5px;
+  bottom: -5px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--ink);
+  opacity: 0.55;
+}
+
+.meter-marker {
+  position: absolute;
+  top: -6px;
+  width: 4px;
+  height: 24px;
+  margin-left: -2px;
+  border-radius: 2px;
+  box-shadow: 0 0 0 2px #fff;
+  transition: left 0.15s ease;
+}
+
+.meter-marker.safe    { background: #0f9d58; }
+.meter-marker.caution { background: #b8860b; }
+.meter-marker.over    { background: #d93025; }
+
+.meter-scale { position: relative; height: 14px; margin-top: 10px; }
+
+.meter-scale span {
+  position: absolute;
+  transform: translateX(-50%);
+  font-size: 10.5px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.meter-scale .at-threshold { color: var(--ink); font-weight: 650; }
+
+.ratio-meta { display: flex; gap: 34px; flex-wrap: wrap; }
+
+.ratio-meta > div { display: flex; flex-direction: column; gap: 3px; }
+
+.ratio-meta span {
   font-size: 10.5px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -839,68 +888,8 @@ body {
   font-weight: 650;
 }
 
-.injury-meta strong { font-size: 15px; font-variant-numeric: tabular-nums; }
-.injury-meta em { font-style: normal; font-size: 11px; color: var(--ink-3); font-weight: 500; }
-
-.injury-scale {
-  display: flex;
-  justify-content: space-between;
-  font-size: 11px;
-  color: var(--ink-3);
-  margin-top: 4px;
-}
-
-.absorb {
-  margin-top: 18px;
-  padding-top: 18px;
-  border-top: 1px solid var(--line);
-}
-
-.absorb-lead { margin: 0 0 12px; font-size: 14px; }
-.absorb-none { margin: 0; font-size: 13.5px; color: var(--ink-2); }
-.absorb-none .link-btn { margin-left: 8px; }
-
-.absorb-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  gap: 12px;
-}
-
-.absorb-card {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  align-items: flex-start;
-  text-align: left;
-  padding: 14px 16px;
-  border-radius: 11px;
-  border: 1px solid var(--line);
-  background: #fff;
-  cursor: pointer;
-  font-family: inherit;
-  border-left-width: 4px;
-  transition: box-shadow 0.15s, transform 0.08s;
-}
-
-.absorb-card:hover { box-shadow: var(--shadow); }
-.absorb-card:active { transform: translateY(1px); }
-.absorb-card.helps { border-left-color: #0f9d58; }
-.absorb-card.hurts { border-left-color: #d93025; }
-
-.absorb-label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-weight: 700;
-  color: var(--ink-3);
-}
-
-.absorb-human { font-size: 16px; font-weight: 620; font-variant-numeric: tabular-nums; }
-.absorb-effect { font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
-
-.absorb-goal { font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.absorb-card.helps .absorb-goal { color: #0b6b3c; }
-.absorb-card.hurts .absorb-goal { color: #c5221f; }
+.ratio-meta strong { font-size: 15px; font-variant-numeric: tabular-nums; }
+.ratio-meta .muted-figure { color: var(--ink-2); font-weight: 600; }
 
 .injury-caveat {
   margin: 16px 0 0;
@@ -1313,3 +1302,23 @@ body {
 }
 
 .verdict-banner.stuck .verdict-nums em { font-size: 9.5px; }
+
+/* ---- injury inverse solve ---- */
+
+.ratio-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.solve-btn { padding: 9px 16px; font-size: 13.5px; }
+.solve-btn:disabled { opacity: 0.5; cursor: default; }
+
+.ratio-ok { font-size: 13px; color: var(--ink-3); }
+
+.ratio-solved { margin-top: 16px; }
+
+.ratio-note { margin: 12px 0 0; font-size: 12px; color: var(--ink-3); }

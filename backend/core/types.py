@@ -186,6 +186,7 @@ class LoadProjection:
 @dataclass(frozen=True)
 class InjuryRisk:
     chance_pct: float
+    threshold_chance_pct: float     # what the curve reads exactly at the threshold
     peak_acwr: float
     threshold_acwr: float
     weeks_above_threshold: int
