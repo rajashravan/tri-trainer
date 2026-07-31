@@ -107,11 +107,9 @@ class SolveIn(BaseModel):
             if not 0 <= w < self.weeks_until_race:
                 raise ValueError(f"blackout week {w + 1} is outside the training block")
 
-        race = defaults.race_def(self.race)
-        for d in DISCIPLINES:
-            floor = defaults.min_plausible_time_s(d, race.distance(d))
-            if getattr(self.goal, f"{d}_s") < floor:
-                raise ValueError(f"{d} goal split is faster than a world record")
+        # No world-record floor on goal splits: exploring an impossible goal is a
+        # legitimate thing to do here, and the verdict already says it is unreachable.
+        # Blocking the move stops the tool answering the question it exists to answer.
         return self
 
 
