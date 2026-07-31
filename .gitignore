@@ -1,0 +1,14 @@
+# Dependencies — recreated by the setup steps in README.md
+backend/venv/
+frontend/node_modules/
+
+# Python build artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Frontend build output
+frontend/dist/
+
+# OS
+.DS_Store
