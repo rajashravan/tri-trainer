@@ -51,6 +51,10 @@ class SettingsIn(BaseModel):
     max_weekly_ctl_ramp: float = Field(default=8.0, gt=0, le=50)
     tight_margin_frac: float = Field(default=0.02, ge=0, le=0.5)
     tri_run_penalty_frac: float = Field(default=0.06, ge=0, le=0.5)
+    injury_base_pct: float = Field(default=3.0, ge=0, le=100)
+    injury_ceiling_pct: float = Field(default=65.0, ge=0, le=100)
+    injury_midpoint_acwr: float = Field(default=1.45, gt=0, le=5)
+    injury_steepness: float = Field(default=5.5, gt=0, le=50)
 
 
 class SolveIn(BaseModel):
@@ -62,6 +66,7 @@ class SolveIn(BaseModel):
     allocation: AllocationIn
     goal: GoalIn
     settings: SettingsIn = SettingsIn()
+    injury_target_pct: float | None = Field(default=None, ge=0, le=100)
 
     @model_validator(mode="after")
     def check(self) -> "SolveIn":
@@ -104,6 +109,6 @@ def to_domain(payload: SolveIn) -> SolveRequest:
 @app.post("/api/solve", response_model=SolveResponse)
 def post_solve(payload: SolveIn) -> SolveResponse:
     try:
-        return solve.solve(to_domain(payload))
+        return solve.solve(to_domain(payload), payload.injury_target_pct)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

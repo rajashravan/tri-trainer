@@ -1,6 +1,9 @@
+import { useMemo, useState } from 'react'
+import ControlRail from './ControlRail'
+import InjuryPanel from './InjuryPanel'
 import { useSolver } from '../useSolver'
 import { formatClock, formatDuration } from '../format'
-import { VERDICT_LABEL } from '../solveTypes'
+import { VERDICT_LABEL, type AbsorberOption } from '../solveTypes'
 import { DISCIPLINE_LABEL, type SolveRequest } from '../types'
 
 interface Props {
@@ -12,7 +15,31 @@ interface Props {
 const signed = (s: number) => `${s >= 0 ? '+' : '−'}${formatDuration(Math.abs(s))}`
 
 export default function Dashboard({ request, onApply, onBack }: Props) {
-  const { result, error, pending } = useSolver(request)
+  const [injuryTarget, setInjuryTarget] = useState<number | null>(null)
+  const payload = useMemo(
+    () => ({ ...request, injury_target_pct: injuryTarget }),
+    [request, injuryTarget],
+  )
+  const { result, error, pending } = useSolver(payload)
+
+  const absorb = (a: AbsorberOption) => {
+    if (a.control === 'weeks') {
+      onApply({ weeks_until_race: Math.round(a.new_value) })
+    } else {
+      const prior =
+        request.allocation.swim_h + request.allocation.bike_h + request.allocation.run_h
+      const k = prior > 0 ? a.new_value / prior : 0
+      onApply({
+        weekly_hours_available: a.new_value,
+        allocation: {
+          swim_h: request.allocation.swim_h * k,
+          bike_h: request.allocation.bike_h * k,
+          run_h: request.allocation.run_h * k,
+        },
+      })
+    }
+    setInjuryTarget(null)
+  }
 
   if (error && !result) {
     return (
@@ -55,6 +82,8 @@ export default function Dashboard({ request, onApply, onBack }: Props) {
 
   return (
     <div className={`dash${pending ? ' pending' : ''}`}>
+      <ControlRail request={request} onChange={onApply} />
+      <div className="dash-main">
       {/* ① Verdict — readable across a room */}
       <section className={`verdict-banner ${result.verdict}`}>
         <div className="verdict-word">{VERDICT_LABEL[result.verdict]}</div>
@@ -147,6 +176,15 @@ export default function Dashboard({ request, onApply, onBack }: Props) {
         </table>
       </section>
 
+      <InjuryPanel
+        injury={result.injury}
+        load={result.load}
+        absorbers={result.injury_absorbers}
+        target={injuryTarget}
+        onTarget={setInjuryTarget}
+        onAbsorb={absorb}
+      />
+
       {result.warnings.length > 0 && (
         <section className="panel warnings">
           <h2>Model caveats</h2>
@@ -163,6 +201,7 @@ export default function Dashboard({ request, onApply, onBack }: Props) {
           Back to onboarding
         </button>
       </footer>
+      </div>
     </div>
   )
 }

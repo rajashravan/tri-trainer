@@ -98,22 +98,55 @@ implementation uses the daily recurrence because the load ramps.
 
 **Ramp rate** = max week-over-week CTL increase across the block, in CTL points/week.
 
-### 1.4 Ramp constraint and the injury question
+### 1.4 Ramp constraint and injury chance
 
-Two distinct mechanisms, deliberately separated:
+**Decision changed mid-build.** This spec originally forbade emitting a calibrated
+injury probability. The product owner overrode that after review, on the grounds that a
+percentage is more understandable to athletes than an abstract index. Implemented as
+asked, with the caveat carried inline on every response rather than buried.
+
+Three mechanisms:
 
 - **HARD constraint (solver):** `peak_weekly_ctl_ramp <= max_weekly_ctl_ramp`
-  (default `8.0` CTL/week). A plan requiring a steeper ramp is reported
-  **infeasible**. It is never printed as a plan.
-- **SOFT flag (display):** `peak_ACWR > acwr_flag_threshold` (default `1.5`, exposed
-  as a user-adjustable numeric input, always visible with its current value).
+  (default `8.0` CTL/week). Overrides the verdict entirely and becomes the binding
+  constraint — a plan can be infeasible on ramp rate while the fitness maths is fine.
+- **SOFT flag (display):** `peak_ACWR > acwr_flag_threshold` (default `1.5`,
+  user-adjustable, always shown next to the value it is being compared against).
+- **Injury chance (%):** logistic in peak ACWR, `core/injury.py`.
 
-**No calibrated injury probability is emitted anywhere in the API or the UI.** The
-response carries a fixed note string:
+```
+chance_pct = base + (ceiling - base) * sigmoid(steepness * (peak_acwr - midpoint))
+# base 3.0, ceiling 65.0, midpoint 1.45, steepness 5.5 — all in SolverSettings
+```
 
-> "Ramp-rate flag against a threshold of {threshold}. Acute:chronic ratio thresholds
-> are contested in the sports science literature; treat this as a heuristic guardrail,
-> not a risk estimate."
+> ⚠️ **The percentage is modelled, not epidemiological.** ACWR-based risk prediction is
+> contested: the acute and chronic windows share data (mathematical coupling), and
+> published thresholds have failed to replicate. The number is monotone and
+> directionally sensible — aggressive ramps read higher — but it is not a calibrated
+> probability for an individual. This caveat ships in the API response
+> (`injury.caveat`) and renders under the figure in the UI. It is not optional.
+
+Alongside the percentage the response carries the **raw quantities**, which claim
+nothing: peak ACWR against the user's threshold, peak ramp in CTL/week, and weeks spent
+above the threshold.
+
+#### Injury chance as a bidirectional aggregate control
+
+Injury chance is derived from the plan, but is also **grabbable** — dragging it down
+forces an absorber, per rule 3. Two absorbers, and the asymmetry is the product:
+
+| Absorber | Injury | Goal |
+|---|---|---|
+| Fewer weekly hours | ↓ | **worse** — less training stimulus |
+| More weeks | ↓ | **better** — same load rise spread over more time |
+
+Solved by bisection on each axis (`injury.absorbers_for`). Note the two axes run in
+opposite directions — safety lies at *more* weeks but *fewer* hours — so the search is
+not written assuming an ascending bracket. Locked by a test asserting the two absorbers
+disagree about the goal; if they ever agree, the control is pointless.
+
+The block-load ramp is linear from current to target weekly volume across the whole
+block, which is the mechanism that makes a longer block gentler.
 
 ### 1.5 Progression model — *the load-bearing heuristic*
 

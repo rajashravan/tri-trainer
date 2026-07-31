@@ -73,6 +73,11 @@ class SolverSettings:
     ctl_reference: dict[str, float] = field(
         default_factory=lambda: {"swim": 45.0, "bike": 75.0, "run": 60.0}
     )
+    # Injury-chance curve. Logistic in peak ACWR. See core/injury.py for the caveat.
+    injury_base_pct: float = 3.0
+    injury_ceiling_pct: float = 65.0
+    injury_midpoint_acwr: float = 1.45
+    injury_steepness: float = 5.5
 
 
 @dataclass(frozen=True)
@@ -116,6 +121,40 @@ class DisciplinePrediction:
 
 
 @dataclass(frozen=True)
+class LoadProjection:
+    weekly_ctl: list[float]
+    weekly_atl: list[float]
+    weekly_acwr: list[float]
+    peak_weekly_ctl_ramp: float
+    peak_acwr: float
+    weeks_above_threshold: int
+    ramp_flag: bool
+    ramp_hard_violation: bool
+    ramp_note: str
+
+
+@dataclass(frozen=True)
+class InjuryRisk:
+    chance_pct: float
+    peak_acwr: float
+    threshold_acwr: float
+    weeks_above_threshold: int
+    caveat: str
+
+
+@dataclass(frozen=True)
+class AbsorberOption:
+    control: str
+    label: str
+    new_value: float
+    human: str
+    resulting_chance_pct: float
+    resulting_verdict: str
+    resulting_margin_s: float
+    helps_goal: bool
+
+
+@dataclass(frozen=True)
 class RelaxationOption:
     control: str
     delta: float
@@ -135,6 +174,9 @@ class SolveResponse:
     margin_s: float
     models: list[DisciplineModel]
     predictions: list[DisciplinePrediction]
+    load: LoadProjection
+    injury: InjuryRisk
+    injury_absorbers: list[AbsorberOption]
     relaxations: list[RelaxationOption]
     cheapest_fix: RelaxationOption | None
     warnings: list[str]

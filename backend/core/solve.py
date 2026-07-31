@@ -1,10 +1,9 @@
 """Orchestrator. The only core module main.py imports."""
 
-from core import relax
+from core import injury, relax
 from core.feasibility import evaluate
-from core.types import SolveRequest, SolveResponse
+from core.types import AbsorberOption, SolveRequest, SolveResponse
 
-CS_VALID_MIN_S = 120.0
 CS_VALID_MAX_S = 900.0
 
 
@@ -19,8 +18,7 @@ def _warnings(req: SolveRequest, result: dict) -> list[str]:
             out.append(f"{d.capitalize()}: the two efforts imply an implausible fatigue "
                        f"curve, so it was clamped to the nearest realistic value.")
         if model.fit_source == "critical_speed":
-            durations = [e.duration_s for e in req.efforts[d]]
-            if any(t > CS_VALID_MAX_S for t in durations):
+            if any(e.duration_s > CS_VALID_MAX_S for e in req.efforts[d]):
                 out.append(
                     f"{d.capitalize()}: efforts longer than 15 min sit outside the window "
                     f"where the critical-speed model is valid; threshold may read low."
@@ -28,14 +26,19 @@ def _warnings(req: SolveRequest, result: dict) -> list[str]:
     return out
 
 
-def solve(req: SolveRequest) -> SolveResponse:
+def solve(req: SolveRequest, injury_target_pct: float | None = None) -> SolveResponse:
     result = evaluate(req)
+    risk = injury.assess(result["load"], req.settings)
 
     if result["verdict"] == "feasible":
         options, fix = [], None
     else:
         options = relax.search(req)
         fix = relax.cheapest(options)
+
+    absorbers: list[AbsorberOption] = []
+    if injury_target_pct is not None and injury_target_pct < risk.chance_pct:
+        absorbers = injury.absorbers_for(req, injury_target_pct, evaluate)
 
     return SolveResponse(
         verdict=result["verdict"],
@@ -46,6 +49,9 @@ def solve(req: SolveRequest) -> SolveResponse:
         margin_s=result["margin_s"],
         models=result["models"],
         predictions=result["predictions"],
+        load=result["load"],
+        injury=risk,
+        injury_absorbers=absorbers,
         relaxations=options,
         cheapest_fix=fix,
         warnings=_warnings(req, result),

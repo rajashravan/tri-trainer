@@ -165,6 +165,73 @@ def test_weeks_and_hours_are_not_the_same_lever():
     assert more_hours < more_weeks, "weekly volume should outweigh block length"
 
 
+# ---------------------------------------------------------------- load & injury
+
+
+def _at(req, hours=None, weeks=None):
+    out = req
+    if hours is not None:
+        out = relax.apply_delta(out, "weekly_hours", hours - out.weekly_hours_available)
+    if weeks is not None:
+        out = relax.apply_delta(out, "weeks", weeks - out.weeks_until_race)
+    return out
+
+
+def test_injury_rises_with_hours_and_falls_with_weeks():
+    req = make_request()
+    chance = lambda r: solve.solve(r).injury.chance_pct
+    assert chance(_at(req, hours=14)) > chance(req) > chance(_at(req, hours=5.5))
+    assert chance(_at(req, weeks=26)) < chance(req) < chance(_at(req, weeks=8))
+
+
+def test_steady_state_training_is_near_baseline_risk():
+    """Holding current volume means no ramp, so ACWR ~1 and risk sits near the floor."""
+    req = _at(make_request(), hours=5.0)
+    r = solve.solve(req)
+    assert r.load.peak_weekly_ctl_ramp < 0.1
+    assert r.injury.peak_acwr == pytest.approx(1.0, abs=0.02)
+    assert r.injury.chance_pct < 10.0
+
+
+def test_hard_ramp_violation_overrides_the_verdict():
+    r = solve.solve(_at(make_request(), hours=20, weeks=8))
+    assert r.verdict == "infeasible"
+    assert r.binding_constraint == "ramp_rate"
+    assert r.load.ramp_hard_violation
+
+
+def test_injury_response_never_omits_the_caveat():
+    r = solve.solve(make_request())
+    assert "contested" in r.injury.caveat
+    assert "not from population injury data" in r.injury.caveat
+
+
+def test_absorbers_actually_hit_the_target():
+    req = _at(make_request(), hours=14, weeks=8)
+    target = 20.0
+    absorbers = solve.solve(req, target).injury_absorbers
+    assert absorbers, "expected at least one way down"
+    for a in absorbers:
+        assert a.resulting_chance_pct <= target + 0.5
+
+
+def test_absorbers_disagree_about_the_goal():
+    """
+    The whole point of the control: cutting hours lowers risk at the cost of the goal,
+    while starting earlier lowers risk and helps it. If both moved the same way the
+    absorber prompt would be pointless.
+    """
+    req = _at(make_request(), hours=14, weeks=8)
+    by = {a.control: a for a in solve.solve(req, 20.0).injury_absorbers}
+    assert by["weekly_hours"].helps_goal is False
+    assert by["weeks"].helps_goal is True
+
+
+def test_unreachable_injury_target_returns_no_absorbers():
+    req = make_request()
+    assert solve.solve(req, 0.5).injury_absorbers == []
+
+
 def test_apply_delta_preserves_allocation_budget():
     after = relax.apply_delta(make_request(), "weekly_hours", 2.0)
     total = after.allocation.swim_h + after.allocation.bike_h + after.allocation.run_h

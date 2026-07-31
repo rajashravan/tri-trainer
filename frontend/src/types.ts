@@ -36,6 +36,7 @@ export interface SolverSettings {
 }
 
 export interface SolveRequest {
+  injury_target_pct?: number | null
   profile: AthleteProfile
   race: RaceKey
   efforts: Record<Discipline, Effort[]>

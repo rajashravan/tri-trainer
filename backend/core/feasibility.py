@@ -1,6 +1,6 @@
 """Verdict, margin, and binding-constraint selection."""
 
-from core import critical_speed, defaults, progression, riegel
+from core import critical_speed, defaults, load, progression, riegel
 from core.types import (
     DISCIPLINES,
     DisciplineModel,
@@ -93,6 +93,29 @@ def evaluate(req: SolveRequest) -> dict:
     headroom = {d: plausible[d] - required[d] for d in DISCIPLINES}
     binding_d = min(DISCIPLINES, key=lambda d: headroom[d])
 
+    # HARD constraint. A plan requiring a physiologically implausible ramp is infeasible
+    # regardless of the fitness maths, and it takes over as the binding constraint.
+    projection = load.project(req)
+    if projection.ramp_hard_violation:
+        return {
+            "verdict": "infeasible",
+            "binding_constraint": "ramp_rate",
+            "binding_explanation": (
+                f"This plan ramps at {projection.peak_weekly_ctl_ramp:.1f} CTL/week against "
+                f"your ceiling of {settings.max_weekly_ctl_ramp:.1f}. Going from "
+                f"{req.profile.current_weekly_hours:.1f} to {req.weekly_hours_available:.1f} "
+                f"h/week in {req.weeks_until_race} weeks is too steep to absorb."
+            ),
+            "projected_finish_s": projected_finish,
+            "goal_finish_s": req.goal.total_s,
+            "margin_s": margin,
+            "models": [models[d] for d in DISCIPLINES],
+            "predictions": _predictions(
+                req, current, projected, required, plausible, headroom, binding_d, "infeasible"
+            ),
+            "load": projection,
+        }
+
     if verdict == "feasible":
         binding = "aggregate_margin"
         explanation = (
@@ -107,7 +130,24 @@ def evaluate(req: SolveRequest) -> dict:
             f"at {req.allocation.get(binding_d):.1f} h/week."
         )
 
-    predictions = [
+    return {
+        "verdict": verdict,
+        "binding_constraint": binding,
+        "binding_explanation": explanation,
+        "projected_finish_s": projected_finish,
+        "goal_finish_s": req.goal.total_s,
+        "margin_s": margin,
+        "models": [models[d] for d in DISCIPLINES],
+        "predictions": _predictions(
+            req, current, projected, required, plausible, headroom, binding_d, verdict
+        ),
+        "load": projection,
+    }
+
+
+def _predictions(req, current, projected, required, plausible, headroom, binding_d, verdict):
+    total = max(1e-9, sum(projected.values()))
+    return [
         DisciplinePrediction(
             discipline=d,
             predicted_current_s=current[d],
@@ -117,22 +157,11 @@ def evaluate(req: SolveRequest) -> dict:
             plausible_time_reduction_pct=plausible[d] * 100.0,
             headroom_pct=headroom[d] * 100.0,
             allocated_hours=req.allocation.get(d),
-            share_of_projected_time_pct=100.0 * projected[d] / max(1e-9, sum(projected.values())),
+            share_of_projected_time_pct=100.0 * projected[d] / total,
             is_binding=(verdict != "feasible" and d == binding_d),
         )
         for d in DISCIPLINES
     ]
-
-    return {
-        "verdict": verdict,
-        "binding_constraint": binding,
-        "binding_explanation": explanation,
-        "projected_finish_s": projected_finish,
-        "goal_finish_s": req.goal.total_s,
-        "margin_s": margin,
-        "models": [models[d] for d in DISCIPLINES],
-        "predictions": predictions,
-    }
 
 
 def _clock(seconds: float) -> str:

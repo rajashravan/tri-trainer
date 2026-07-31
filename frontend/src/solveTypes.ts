@@ -34,6 +34,37 @@ export interface RelaxationOption {
   normalized_cost: number
 }
 
+export interface LoadProjection {
+  weekly_ctl: number[]
+  weekly_atl: number[]
+  weekly_acwr: number[]
+  peak_weekly_ctl_ramp: number
+  peak_acwr: number
+  weeks_above_threshold: number
+  ramp_flag: boolean
+  ramp_hard_violation: boolean
+  ramp_note: string
+}
+
+export interface InjuryRisk {
+  chance_pct: number
+  peak_acwr: number
+  threshold_acwr: number
+  weeks_above_threshold: number
+  caveat: string
+}
+
+export interface AbsorberOption {
+  control: 'weekly_hours' | 'weeks'
+  label: string
+  new_value: number
+  human: string
+  resulting_chance_pct: number
+  resulting_verdict: Verdict
+  resulting_margin_s: number
+  helps_goal: boolean
+}
+
 export interface SolveResponse {
   verdict: Verdict
   binding_constraint: string
@@ -43,6 +74,9 @@ export interface SolveResponse {
   margin_s: number
   models: DisciplineModel[]
   predictions: DisciplinePrediction[]
+  load: LoadProjection
+  injury: InjuryRisk
+  injury_absorbers: AbsorberOption[]
   relaxations: RelaxationOption[]
   cheapest_fix: RelaxationOption | null
   warnings: string[]
